@@ -97,7 +97,7 @@
         const d=0.20,filters=[];
         for(let i=0;i<blobs.length;i++){
           filters.push("["+i+":v:0]fps=24,scale="+info[0].width+":"+info[0].height+
-            ",format=yuv420p,settb=AVTB,setpts=PTS-STARTPTS[v"+i+"]");
+            ",format=yuv420p[v"+i+"]");
           filters.push("["+i+":a:0]aresample=48000,asetpts=PTS-STARTPTS[a"+i+"]");
         }
         let previousVideo="v0",previousAudio="a0",timeline=info[0].duration;
