@@ -1,8 +1,6 @@
-name: Verify Iraqi Film Forge
+name: Manual Validation
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
 jobs:
   check:
     runs-on: ubuntu-latest
