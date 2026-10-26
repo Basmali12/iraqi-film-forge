@@ -206,8 +206,9 @@ $("approvePlan").onclick=async()=>{
   return state("planStatus","لتجنب شخصية تاريخية عشوائية: ارفع صورة مرجعية أولاً، أو ناقش المرجع مع المخرج. هذا منع للخصم الخطأ.");
  if(!settings.router)return state("planStatus","أضف مفتاح OpenRouter للفيديو من ⚙️ إعدادات المفاتيح");
  if(!confirm("موافقة على إنتاج "+m.slots.length+" مقطعاً، مجموع "+m.seconds+" ثانية. السعر المرجعي يبدأ من $"+m.estimate.toFixed(2)+" عند 480p، ولا يشمل التغيّر بالأسعار أو تكرار الطلب. كل مشهد قد يخصم من OpenRouter. هل توافق؟"))return;
- p.approved=true;persist();render();state("chatStatus","✓ وافقت على التقرير. تشغيل إنتاج الفيديو يحتاج ضغط «استئناف الإنتاج» أسفل الصفحة، حتى يكون قرار الصرف واضحاً.");
+ p.approved=true;persist();render();state("chatStatus","✓ تمت الموافقة. يبدأ الآن توليد المشاهد بالترتيب تلقائياً.");
  $("production").scrollIntoView({behavior:"smooth"});
+ await runProduction(true);
 };
 function pushLog(message){const el=document.createElement("div");el.textContent=new Date().toLocaleTimeString("ar-IQ")+" — "+message;$("productionLog").prepend(el)}
 function renderProgress(){
@@ -236,10 +237,10 @@ async function lastImage(blob){
  }finally{v.src="";URL.revokeObjectURL(u)}
 }
 const sleep=t=>new Promise(ok=>setTimeout(ok,t));
-async function runProduction(){
+async function runProduction(alreadyConfirmed=false){
  const p=selected();if(!p?.approved||working)return;
  if(!settings.router)return state("chatStatus","مفتاح الفيديو OpenRouter غير موجود");
- if(!confirm("هل تريد بدء أو استئناف مهام HeyGen المدفوعة؟ ماكو إعادة تلقائية لمهمة فاشلة أو مجهولة."))return;
+ if(!alreadyConfirmed&&!confirm("هل تريد بدء أو استئناف مهام HeyGen المدفوعة؟ ماكو إعادة تلقائية لمهمة فاشلة أو مجهولة."))return;
  working=true;stopping=false;renderProgress();pushLog("بداية الإنتاج الآمن");
  try{
   const slots=p.plan.slots;
@@ -248,6 +249,9 @@ async function runProduction(){
    const s=slots[i];if(s.status==="done")continue;
    if(s.status==="failed"||s.status==="ambiguous")throw Error("المشهد "+(i+1)+" يحتاج فحصاً يدوياً قبل أي إعادة إرسال");
    if(s.status!=="submitted"){
+    const knownSpent=slots.reduce((sum,item)=>sum+(typeof item.cost==="number"?item.cost:0),0);
+    const estimatedUnknown=slots.filter(item=>item.status==="done"&&typeof item.cost!=="number").length*(p.plan.estimate/slots.length);
+    if(knownSpent+estimatedUnknown+(p.plan.estimate/slots.length)>p.plan.estimate*1.30)throw Error("بلغنا سقف أمان تقريبي للصرف (130% من تقدير التقرير). توقّفنا لمراجعة الكلفة قبل المزيد.");
     const payload={model:VIDEO,prompt:s.prompt,duration:15,resolution:p.plan.quality,aspect_ratio:p.plan.ratio};
     if(i>0){
      const previous=await getData(p.id+"-clip-"+(i-1));
