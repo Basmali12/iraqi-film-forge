@@ -11,3 +11,10 @@
 #filmFinal{padding:12px;border:1px solid #306957;border-radius:16px;background:#132b28;margin-top:14px}#filmPlayer{width:100%;max-height:460px;background:black;border-radius:12px}#filmDownload{display:block;padding:12px;font-weight:800}#filmTime,#filmQuality,#filmRatio{width:100%}
 .film-shell [hidden]{display:none!important}
 @media(max-width:750px){.options{grid-template-columns:1fr 1fr}.metric-grid{grid-template-columns:repeat(2,1fr)}.film-shell section{padding:15px}.stage{font-size:10px}.back{font-size:12px}.film-shell header strong{font-size:14px}.film-shell header small{font-size:10px}}
+
+/* Character continuity report */
+#characterPanel .character-card{border-color:#345b79;background:#102035}
+.character-card p{margin:6px 0}
+.character-card input[type=url]{margin:6px 0 12px;direction:ltr;text-align:left}
+.character-card textarea{font-size:13px}
+#approveCharacters:disabled{opacity:.5}
