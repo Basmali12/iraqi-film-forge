@@ -3,7 +3,7 @@
 <meta name="theme-color" content="#0b1120"><title>صناعة فيلم كامل | Iraqi Film Forge</title>
 <link rel="stylesheet" href="./styles.css?v=3">
 <link rel="stylesheet" href="./film.css?v=2">
-<script defer src="./stitcher.js?v=2"></script><script defer src="./film.js?v=3"></script></head>
+<script defer src="./stitcher.js?v=2"></script><script defer src="./film.js?v=4"></script></head>
 <body><main class="film-shell">
 <header><div><strong>🎬 ستوديو الأفلام العراقي</strong><br><small>Forge Film · HeyGen Video · OpenRouter</small></div><a class="back" href="./index.html">← مولّد المقاطع القصيرة</a></header>
 <nav class="tabs"><a href="./index.html">مقطع قصير</a><a class="active" href="./film.html" aria-current="page">🎞️ صناعة فيلم كامل</a></nav>
@@ -20,6 +20,13 @@
 <div><label>أبعاد الفيلم</label><select id="filmRatio"><option value="9:16">9:16 ريلز</option><option value="16:9">16:9 سينمائي</option></select></div></div>
 <div class="button-row"><button id="analyzeFilm">✦ تحليل القصة وإصدار التقرير</button><button id="restoreFilm" class="soft">استعادة آخر مشروع</button></div>
 <div id="filmAnalyzeStatus" class="state">التحليل لا يولّد فيديو، لكنه يستخدم نموذج دردشة نصياً قد تكون عليه كلفة صغيرة.</div>
+</section>
+<section class="step" id="characterPanel" hidden>
+<div class="stephead"><span class="stepnum">3</span><div><h2>👤 تقرير الشخصيات والمراجع</h2><p>الذكاء يكتشف الشخصيات التاريخية والخيالية وأعمارها، لكن المرجع البصري يحتاج موافقتك قبل التوليد.</p></div></div>
+<p class="caution">التعرّف على الاسم لا يضمن مطابقة الوجه. للتطابق الأقوى أضف صورة مرجعية برابط HTTPS مباشر لكل شخصية. هذا القسم لا يبحث عن صور تاريخية من الإنترنت تلقائياً ولا يولّد صوراً جديدة بعد.</p>
+<div id="characterList" class="scene-list"></div>
+<div class="button-row"><button id="approveCharacters" type="button">✓ أعتمد الشخصيات والأعمار</button><button id="editCharacters" class="soft" type="button">تعديل تقرير الشخصيات</button></div>
+<div id="characterStatus" class="state">بانتظار تحليل القصة والشخصيات.</div>
 </section>
 <section class="step" id="reportPanel" hidden>
 <div class="stephead"><span class="stepnum">3</span><div><h2>تقرير الفيلم قبل التوليد</h2><p>اعرف كل التفاصيل قبل الموافقة على أي عملية مدفوعة.</p></div></div>
