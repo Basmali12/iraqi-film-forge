@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0b1120"><title>صناعة فيلم كامل | Iraqi Film Forge</title>
+<link rel="stylesheet" href="./styles.css?v=3">
+<link rel="stylesheet" href="./film.css?v=1">
+<script defer src="./stitcher.js?v=2"></script><script defer src="./film.js?v=1"></script></head>
+<body><main class="film-shell">
+<header><div><strong>🎬 ستوديو الأفلام العراقي</strong><br><small>Forge Film · HeyGen Video · OpenRouter</small></div><a class="back" href="./index.html">← مولّد المقاطع القصيرة</a></header>
+<nav class="tabs"><a href="./index.html">مقطع قصير</a><a class="active" href="./film.html" aria-current="page">🎞️ صناعة فيلم كامل</a></nav>
+<section class="hero"><div class="eyebrow">إخراج متسلسل لقصص 3–10 دقائق</div><h1>من قصة طويلة إلى <em>فيلم متكامل</em></h1><p>اكتب القصة. حلّل السيناريو واعرف مدة الفيلم والكلفة وعدد الفيديوهات. بعد موافقتك أنت، يبدأ توليد المشاهد بالترتيب مع متابعتها ودمجها. لا يتم دفع أي رسوم فيديو قبل الموافقة الصريحة.</p></section>
+<section class="step" id="connectPanel">
+<div class="stephead"><span class="stepnum">1</span><div><h2>اربط OpenRouter بأمان</h2><p>المفتاح يبقى بذاكرة الصفحة، ولا يُحفظ داخل GitHub أو في مشروع الفيلم.</p></div></div>
+<div class="flex"><input id="filmKey" type="password" placeholder="sk-or-v1-..." autocomplete="off"><button id="filmConnect">ربط</button><button id="filmDisconnect" hidden class="soft">فصل</button></div><div id="filmKeyStatus" class="state">غير متصل</div>
+</section>
+<section class="step" id="storyPanel">
+<div class="stephead"><span class="stepnum">2</span><div><h2>أضف برومبت القصة</h2><p>الأسماء والملابس والأماكن والحوار العراقي وتسلسل الأحداث.</p></div></div>
+<textarea id="filmStory" rows="9" placeholder="مثال: قصة عراقية في العمارة... البطل علي، عمره 25، بنفس الملابس والوجه... الأحداث والحوار بالتسلسل..."></textarea>
+<div class="options"><div><label>المدة المقترحة</label><select id="filmTime"><option value="auto" selected>الذكاء يقرر</option><option value="180">3 دقائق</option><option value="240">4 دقائق</option><option value="300">5 دقائق</option><option value="600">10 دقائق</option></select></div>
+<div><label>دقة الفيديو</label><select id="filmQuality"><option value="480p" selected>480p - اقتصادي</option><option value="768p">768p - أوضح</option></select></div>
+<div><label>أبعاد الفيلم</label><select id="filmRatio"><option value="9:16">9:16 ريلز</option><option value="16:9">16:9 سينمائي</option></select></div></div>
+<div class="button-row"><button id="analyzeFilm">✦ تحليل القصة وإصدار التقرير</button><button id="restoreFilm" class="soft">استعادة آخر مشروع</button></div>
+<div id="filmAnalyzeStatus" class="state">التحليل لا يولّد فيديو، لكنه يستخدم نموذج دردشة نصياً قد تكون عليه كلفة صغيرة.</div>
+</section>
+<section class="step" id="reportPanel" hidden>
+<div class="stephead"><span class="stepnum">3</span><div><h2>تقرير الفيلم قبل التوليد</h2><p>اعرف كل التفاصيل قبل الموافقة على أي عملية مدفوعة.</p></div></div>
+<h3 id="reportTitle">التقرير</h3><p id="reportSynopsis"></p>
+<div class="metric-grid"><div><small>المدة المستهدفة</small><strong id="metricDuration">—</strong></div><div><small>عدد مقاطع الفيديو</small><strong id="metricScenes">—</strong></div><div><small>الثواني المولدة</small><strong id="metricSeconds">—</strong></div><div><small>السعر المرجعي الأدنى</small><strong id="metricPrice">—</strong></div></div>
+<p class="caution">⚠️ السعر المرجعي ليس عرض سعر ملزماً ولا حداً أقصى تفرضه OpenRouter. قد تتغير التعرفة، وطلبات صورة البداية أو إعادة التوليد قد تُحتسب بشكل مختلف. الكلفة الفعلية تظهر بعد نجاح كل طلب. التوليد يبدأ بالصور المستخرجة من آخر فريم، وليس ضماناً للحركة والهوية بنسبة 100%.</p>
+<h3>قائمة المشاهد المقترحة</h3><div id="filmScenes" class="scene-list"></div>
+<div class="button-row"><button id="filmApprove">✓ أوافق على إنتاج هذا الفيلم</button><button id="filmReject" class="soft">تعديل القصة</button><button id="filmExportPlan" class="soft">تنزيل السيناريو JSON</button></div><div id="filmApprovalStatus" class="state">بانتظار موافقتك.</div>
+</section>
+<section class="step" id="productionPanel" hidden>
+<div class="stephead"><span class="stepnum">4</span><div><h2>🎬 مراحل إنتاج الفيلم</h2><p>متابعة كل مقطع، ومعالجة المشاهد بالتسلسل، ثم دمج MP4.</p></div></div>
+<div class="progress-head"><strong id="filmStage">لم يبدأ التوليد</strong><span id="filmPercent">0%</span></div><div class="progress-track"><div id="filmProgress"></div></div>
+<div class="stages"><div class="stage active" data-stage="planning"><span>✓</span><b>تحليل</b></div><div class="stage" data-stage="generation"><span>◉</span><b>توليد</b></div><div class="stage" data-stage="continuation"><span>◉</span><b>استكمال</b></div><div class="stage" data-stage="merge"><span>◉</span><b>دمج</b></div><div class="stage" data-stage="complete"><span>✓</span><b>اكتمل</b></div></div>
+<div id="filmRuntimeStatus" class="state" role="status">لم يبدأ التنفيذ.</div><div id="filmTimeline" class="timeline"></div>
+<div class="button-row"><button id="filmResume">▶ بدء التوليد</button><button id="filmPause" class="soft" disabled>إيقاف بعد المشهد الجاري</button><button id="filmMerge" class="soft" disabled>دمج المقاطع الحالية</button></div>
+<p class="note">لإنتاج فيلم طويل بشكل مضمون حتى لو انغلق الهاتف، لازم ننقل عامل التوليد إلى سيرفرنا. النسخة الحالية تنفذ بالمتصفح وتحفظ كل مقطع بعد إكماله؛ إذا خرجت من الصفحة تتوقف المتابعة التلقائية وتحتاج ترجع وتضغط استئناف. إيقاف التنفيذ ما يلغي طلب الفيديو اللي انرسل بالفعل.</p>
+<div id="filmFinal" hidden><h3>الفيلم النهائي</h3><video id="filmPlayer" controls playsinline></video><a id="filmDownload" download="iraqi-film.mp4">⬇ تنزيل الفيلم الموحد MP4</a></div>
+</section>
+<footer>مشروع منفصل عن مشهد. ربط HeyGen Video فقط، ومساعد التخطيط نصي منخفض الكلفة. <a href="https://github.com/Basmali12/iraqi-film-forge">المستودع</a></footer>
+</main></body></html>
