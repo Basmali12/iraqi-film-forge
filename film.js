@@ -78,8 +78,8 @@ function refresh(){
  $("productionPanel").hidden=!project.approved;
  $("filmResume").disabled=running||done===scenes.length;
  $("filmPause").disabled=!running;
- $("filmMerge").disabled=running||mergeBusy||done<2;
- if(done===scenes.length)stage("merge");
+ $("filmMerge").disabled=running||mergeBusy||done!==scenes.length;
+ if(done===scenes.length)stage($("filmFinal").hidden?"merge":"complete");
  else if(done>0)stage("continuation");
  else stage("planning");
 }
@@ -94,7 +94,7 @@ $("filmConnect").onclick=async()=>{
 $("filmDisconnect").onclick=()=>{apiKey="";$("filmKey").hidden=false;$("filmConnect").hidden=false;$("filmDisconnect").hidden=true;report("filmKeyStatus","تم فصل المفتاح")};
 async function textAI(messages,maxTokens=2000){
  const r=await api("/chat/completions",{method:"POST",payload:{model:CHAT,messages,temperature:.3,max_tokens:maxTokens}});
- return String(r.choices?.[0]?.message?.content||"").replace(/^``(?:json)?\s*/,"").replace(/``\s*$/,"").trim();
+ return String(r.choices?.[0]?.message?.content||"").replace(/^\x60{3}(?:json)?\s*/,"").replace(/\x60{3}\s*$/,"").trim();
 }
 function parseJSON(text){
  try{return JSON.parse(text)}catch{
@@ -134,6 +134,7 @@ $("analyzeFilm").onclick=async()=>{
    part.forEach((s,i)=>scenes.push({id:"S"+String(start+i+1).padStart(3,"0"),duration:clipDurationAt(start+i,count),prompt:String(s.prompt||"").trim(),status:"pending",jobId:null,cost:null}));
   }
   if(scenes.some(x=>x.prompt.length<25))throw Error("هناك مشهد فارغ في خطة الذكاء");
+  // New project: old media keys are version-scoped to avoid accidental film mixing.
   project={version:1,title:String(meta.title||"فيلم عراقي"),synopsis:String(meta.synopsis||""),story,scenes,
    rate:rate(),resolution:$("filmQuality").value,ratio:$("filmRatio").value,approved:false,spent:0,created:Date.now()};
   await saveProject();refresh();stage("planning");
