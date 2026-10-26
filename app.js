@@ -2,7 +2,7 @@
 const $ = id => document.getElementById(id);
 const VIDEO_MODEL="heygen/heygen-video-1";
 const CHAT_MODEL="openai/gpt-4.1-nano";
-const BASE="https://openrouter.ai/api/v1";
+const BASE=(location.hostname==="localhost"||location.hostname==="127.0.0.1")?"/api/v1":"https://openrouter.ai/api/v1";
 let key="",messages=[],lastReply="",currentClip=null,currentURL=null,storyboard=[],generating=false;
 function status(id,message){$(id).textContent=message}
 function errorText(e){return String((e&&e.message)||e).slice(0,460)}
