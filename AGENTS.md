@@ -32,3 +32,15 @@ This repository is an **independent project**. NEVER edit or connect to `mashhad
 - Run a dry storyboard test.
 - Verify GitHub Pages public URL actually resolves rather than guessing.
 - Never run any video generation request unless the user authorizes its cost.
+
+## Film continuation and no-loss merging (added 2026-10-26)
+- The browser must maintain an ordered `filmClips` array of *original generated video blobs*, and the latest **raw** clip is the source for the next last-frame seed.
+- NEVER overwrite the previous successful clip when a continuation succeeds.
+- After each continuation, try local FFmpeg.wasm quick stream-copy concatenation. If the user selects a soft transition, attempt 0.20s `xfade` and `acrossfade` for aligned audio/video, but preserve all original segments if merging fails.
+- Use IndexedDB for clip blobs, not API keys. Offer user-imported prior MP4 clips to recover older work, and an explicit reset action only after confirmation.
+- For server-side final rendering, `tools/assemble.py --transition smooth` uses FFmpeg native filters, retaining Iraqi dialogue.
+- Browser WASM is limited on phones and downloads its core from a pinned JSDelivr CDN version. For production or longer films, migrate to a secure authorized backend.
+- Video concatenation is not native video continuation; optical flow, identity and voice quality are not guaranteed. Do not hide this distinction.
+- No OpenRouter video request is made during local MP4 merging or original-clip import.
+- Inspect and test both `site/` on `main` and mirrored `gh-pages` assets before deploying.
+
