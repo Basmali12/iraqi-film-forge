@@ -1,0 +1,1 @@
+This directory will hold the MIT-licensed original Forge Film source at pinned revision f67f0a003. To vendor it: `bash scripts/vendor_forge.sh`. Do NOT claim vendoring is completed until actual source files and LICENSE are present. Original repository: https://github.com/F-R-L/forge-film .
