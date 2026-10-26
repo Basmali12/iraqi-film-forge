@@ -145,14 +145,11 @@ $("analyzeFilm").onclick=async()=>{
  let btn=$("analyzeFilm");btn.disabled=true;
  try{
   report("filmAnalyzeStatus","المرحلة 1/2: تحليل القصة وتقدير مدتها…");
-  const requested=$("filmTime").value;
-  const scope=requested==="auto"?
-  "Choose appropriate target_seconds from [180,240,300,600] based on narrative complexity, dialogue and pacing. Prefer 240 or 300 for a coherent full story.":
-  "Set target_seconds exactly to "+requested+".";
+  const scope="Choose the film duration autonomously from the entire narrative, exact requested runtime if provided, chronological event count and natural pacing. If the user explicitly says 300 seconds, choose 300. Otherwise choose a realistic duration between 30 and 600 seconds. Return target_seconds rounded to the nearest 15 seconds, with a minimum of 30. Never automatically default to 4 or 5 minutes. Explain pacing in the synopsis. Output does not begin generation.";
   const meta=await structuredAI([{role:"system",content:"You are an Iraqi film director and story analyst. Return ONLY compact valid JSON with exactly keys title (string), synopsis (Arabic string), target_seconds (integer). "+scope+" Retain the sequence of cause then reaction. Do not include unescaped quotes. No video generation."},{role:"user",content:story}],950,o=>!!o&&typeof o.title==="string"&&typeof o.synopsis==="string"&&Number.isFinite(Number(o.target_seconds)));
-  const permitted=[180,240,300,600];
-  const seconds=Number(requested==="auto"?meta.target_seconds:requested);
-  if(!permitted.includes(seconds))throw Error("مدة الفيلم غير مدعومة. اخترها يدوياً وأعد التحليل");
+  const rawSeconds=Number(meta.target_seconds);
+  if(!Number.isFinite(rawSeconds)||rawSeconds<30||rawSeconds>600)throw Error("الذكاء اقترح مدة خارج حدود النسخة التجريبية (30–600 ثانية). أعد التحليل بتوضيح إيقاع القصة.");
+  const seconds=Math.max(30,Math.min(600,Math.round(rawSeconds/15)*15));
   const count=seconds/15,scenes=[];
   // Work in groups of 8 to prevent output truncation on films with 20–40 scenes.
   for(let start=0;start<count;start+=8){
