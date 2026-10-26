@@ -107,7 +107,7 @@ async function textAI(messages,maxTokens=2000,strictJSON=false){
 }
 function stripFences(text){
  let value=String(text||"").trim().replace(/^\uFEFF/,"");
- value=value.replace(/^``(?:json)?\s*/i,"").replace(/``\s*$/,"").trim();
+ value=value.replace(/^\x60{3}(?:json)?\s*/i,"").replace(/\x60{3}\s*$/,"").trim();
  const first=value.indexOf("{"),last=value.lastIndexOf("}");
  return first>=0&&last>first?value.slice(first,last+1):value;
 }
