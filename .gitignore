@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+node_modules/
+__pycache__/
+*.pyc
+output/
+clips/
+*.mp4
+*.wav
+*.secret
+.DS_Store
