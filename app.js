@@ -103,20 +103,137 @@ $("generate").onclick=async()=>{
  let resolution=$("resolution").value,ratio=$("ratio").value,tail=$("carry").checked?currentClip:null;
  if(prompt.length<8)return status("videoStatus","البرومبت قصير");
  if($("carry").checked&&!tail)return status("videoStatus","ماكو فيديو سابق للاستكمال");
+ if(!tail&&filmClips.length&&!confirm("هذا يولد فيلم جديد ويبدأ قائمة مقاطع جديدة. حمّلت نسخة الفيلم القديم؟"))return;
  let rate=resolution==="480p"?0.01:0.018;
  if(!confirm("إنشاء فيديو مدفوع من HeyGen Video فقط. "+duration+" ثانية بدقة "+resolution+
    ". السعر المرجعي يبدأ من $"+(duration*rate).toFixed(2)+"، وقد يزيد أو يتغير. موافق؟"))return;
  generating=true;$("generate").disabled=true;
  try{
   let r=await generateVideo(prompt,duration,resolution,ratio,tail);
-  currentClip=r.blob;if(currentURL)URL.revokeObjectURL(currentURL);
-  currentURL=URL.createObjectURL(r.blob);
-  $("player").src=currentURL;$("download").href=currentURL;
-  $("download").download="heygen-"+String(r.id).slice(0,17)+".mp4";
-  $("result").hidden=false;status("videoStatus","تم إنشاء الفيديو ✓ "+(r.cost!=null?"الكلفة الفعلية $"+r.cost:""))
+  if(!tail)filmClips=[];
+  await appendScene(r.blob,"heygen-"+String(r.id).slice(0,17)+".mp4");
+  status("videoStatus","تم إنشاء المشهد ✓ "+(r.cost!=null?"الكلفة الفعلية $"+r.cost:""));
+  if(filmClips.length>1)await mergeFilm();
+  else status("joinStatus","المشهد الأول محفوظ. فعّل «متابعة من آخر فريم» حتى تضيف مقطعاً ثانياً.")
  }catch(e){status("videoStatus","خطأ: "+errorText(e)+" — افحص حالة المهمة قبل إنشاء طلب جديد")}
  finally{generating=false;$("generate").disabled=false}
 };
+
+
+/* Multi-scene film session. Media is stored in IndexedDB on the user's device; the API key is not stored. */
+let filmClips=[],merging=false;
+const FILM_DB="iraqi-film-forge-clips-v1";
+function filmDB(){
+ return new Promise((resolve,reject)=>{
+  if(!("indexedDB" in window))return reject(Error("المتصفح لا يدعم حفظ المقاطع"));
+  const open=indexedDB.open(FILM_DB,1);
+  open.onupgradeneeded=()=>{if(!open.result.objectStoreNames.contains("clips"))open.result.createObjectStore("clips",{keyPath:"order"})};
+  open.onsuccess=()=>resolve(open.result);open.onerror=()=>reject(open.error||Error("فشل فتح التخزين"));
+ });
+}
+async function persistFilm(){
+ let db=await filmDB();
+ try{
+  await new Promise((resolve,reject)=>{
+   const tx=db.transaction("clips","readwrite"),store=tx.objectStore("clips");
+   store.clear();
+   filmClips.forEach((item,i)=>store.put({order:i,blob:item.blob,duration:item.duration,name:item.name}));
+   tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error)
+  });
+ }finally{db.close()}
+}
+async function restoreFilm(){
+ try{
+  const db=await filmDB();let records;
+  try{records=await new Promise((resolve,reject)=>{
+   const req=db.transaction("clips","readonly").objectStore("clips").getAll();
+   req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)
+  })}finally{db.close()}
+  if(records&&records.length){
+   records.sort((a,b)=>a.order-b.order);
+   filmClips=records.filter(i=>i.blob&&i.blob.size).map(i=>({blob:i.blob,duration:i.duration,name:i.name}));
+   currentClip=filmClips[filmClips.length-1].blob;
+   showPreview(currentClip,"film-latest-scene.mp4");
+   status("joinStatus","استعدنا "+filmClips.length+" مقطعاً من جهازك. اضغط «دمج كل المقاطع» لعرض الفيلم كاملاً");
+   updateFilmInfo()
+  }
+ }catch(e){status("joinStatus","تعذّر استعادة المقاطع المحفوظة: "+errorText(e))}
+}
+function updateFilmInfo(){
+ const seconds=filmClips.reduce((sum,item)=>sum+(item.duration||0),0);
+ status("joinCount",filmClips.length+" مقطع | "+seconds.toFixed(1)+" ثانية تقريباً");
+ $("joinBtn").disabled=merging||generating||filmClips.length<2;
+}
+function showPreview(blob,name){
+ if(currentURL)URL.revokeObjectURL(currentURL);
+ currentURL=URL.createObjectURL(blob);
+ $("player").src=currentURL;$("download").href=currentURL;
+ $("download").download=name||"iraqi-film.mp4";
+ $("result").hidden=false;
+}
+async function appendScene(clip,name){
+ const metadata=await window.IraqiFilmStitcher.inspect(clip);
+ filmClips.push({blob:clip,duration:metadata.duration,name:name||"scene-"+filmClips.length+".mp4"});
+ currentClip=clip;
+ showPreview(clip,"latest-scene.mp4");
+ updateFilmInfo();
+ try{await persistFilm()}catch(e){
+  status("joinStatus","المقاطع موجودة في الجلسة فقط. التخزين المحلي امتلأ؛ حمّل ملفاتك: "+errorText(e))
+ }
+}
+async function mergeFilm(){
+ if(merging||filmClips.length<2)return;
+ merging=true;updateFilmInfo();
+ const chosenMode=$("joinType").value;
+ try{
+  let out=await window.IraqiFilmStitcher.merge(filmClips.map(i=>i.blob),chosenMode,
+    msg=>status("joinStatus",msg));
+  showPreview(out.blob,"iraqi-film-"+filmClips.length+"-scenes.mp4");
+  status("joinStatus","✅ ملف موحد جاهز: "+out.duration.toFixed(1)+
+   " ثانية، "+out.segments+" مقاطع. تگدر تحمله MP4 بدون كلفة توليد إضافية.");
+  status("videoStatus","الفيلم الكامل مدموج ✓ (المتابعة القادمة تستخدم آخر فريم من آخر مشهد، مو الفيلم الكامل)");
+ }catch(e){
+  status("joinStatus","ما اكدر أدمج المقاطع بهاتفك حالياً: "+errorText(e)+
+    ". مقاطعك محفوظة ولم تُحذف. جرب وضع «وصل مباشر» أو الدمج على السيرفر.");
+  // The preview remains available; do not claim a complete film was merged.
+ }finally{merging=false;updateFilmInfo()}
+}
+$("joinBtn").onclick=()=>mergeFilm();
+$("newFilmBtn").onclick=async()=>{
+ if(!filmClips.length)return;
+ if(!confirm("بدء فيلم جديد يمسح لقطات هذا الفيلم من تخزين المتصفح. حمّلت نسخة الفيلم القديم؟"))return;
+ filmClips=[];currentClip=null;
+ $("carry").checked=false;
+ if(currentURL){URL.revokeObjectURL(currentURL);currentURL=null}
+ $("player").removeAttribute("src");$("player").load();$("result").hidden=true;
+ try{await persistFilm()}catch(e){}
+ status("joinStatus","بدأنا فيلم جديد؛ ماكو مقاطع");
+ updateFilmInfo()
+};
+$("importFiles").onchange=async()=>{
+ const files=Array.from($("importFiles").files||[]).sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
+ if(!files.length)return;
+ if(filmClips.length&&!confirm("تريد تبدل المقاطع الحالية بالمقاطع المحددة؟ حمّل القديمة قبل الاستبدال.")){
+  $("importFiles").value="";return
+ }
+ try{
+  status("joinStatus","قراءة الفيديوهات القديمة من الجهاز…");
+  const entries=[];
+  for(const file of files){
+   const info=await window.IraqiFilmStitcher.inspect(file);
+   entries.push({blob:file,duration:info.duration,name:file.name});
+  }
+  filmClips=entries;currentClip=entries[entries.length-1].blob;
+  showPreview(currentClip,"latest-imported-scene.mp4");
+  updateFilmInfo();
+  try{await persistFilm()}catch(e){status("joinStatus","تم الاستيراد بالجلسة، لكن التخزين المحلي فشل: "+errorText(e))}
+  if(filmClips.length>1)await mergeFilm();
+  else status("joinStatus","تم استيراد فيديو واحد؛ تگدر تكمله من آخر فريم")
+ }catch(e){status("joinStatus","فشل استيراد المقاطع: "+errorText(e))}
+ finally{$("importFiles").value=""}
+};
+updateFilmInfo();
+restoreFilm();
 
 $("plan").onclick=async()=>{
  let story=$("story").value.trim(),count=Math.ceil(Number($("filmDuration").value)/15);
