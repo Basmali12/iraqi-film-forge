@@ -92,15 +92,47 @@ $("filmConnect").onclick=async()=>{
  finally{$("filmConnect").disabled=false}
 };
 $("filmDisconnect").onclick=()=>{apiKey="";$("filmKey").hidden=false;$("filmConnect").hidden=false;$("filmDisconnect").hidden=true;report("filmKeyStatus","تم فصل المفتاح")};
-async function textAI(messages,maxTokens=2000){
- const r=await api("/chat/completions",{method:"POST",payload:{model:CHAT,messages,temperature:.3,max_tokens:maxTokens}});
- return String(r.choices?.[0]?.message?.content||"").replace(/^\x60{3}(?:json)?\s*/,"").replace(/\x60{3}\s*$/,"").trim();
+async function textAI(messages,maxTokens=2000,strictJSON=false){
+ const payload={model:CHAT,messages,temperature:.15,max_tokens:maxTokens};
+ // Prefer OpenRouter constrained JSON; retry without this feature if a provider rejects it.
+ if(strictJSON)payload.response_format={type:"json_object"};
+ let r;
+ try{r=await api("/chat/completions",{method:"POST",payload})}
+ catch(e){
+  if(!strictJSON||!/response.format|response_format|json_object|unsupported|invalid parameter|HTTP 400/i.test(err(e)))throw e;
+  delete payload.response_format;
+  r=await api("/chat/completions",{method:"POST",payload});
+ }
+ return String(r.choices?.[0]?.message?.content||"").trim();
+}
+function stripFences(text){
+ let value=String(text||"").trim().replace(/^\uFEFF/,"");
+ value=value.replace(/^``(?:json)?\s*/i,"").replace(/``\s*$/,"").trim();
+ const first=value.indexOf("{"),last=value.lastIndexOf("}");
+ return first>=0&&last>first?value.slice(first,last+1):value;
 }
 function parseJSON(text){
- try{return JSON.parse(text)}catch{
- const i=text.indexOf("{"),j=text.lastIndexOf("}");if(i<0||j<=i)throw Error("المساعد لم يرجع JSON صالحاً");
- return JSON.parse(text.slice(i,j+1))
+ const clean=stripFences(text);
+ try{return JSON.parse(clean)}
+ catch(e){throw Error("رجع المساعد تقريراً بتنسيق غير صالح: "+e.message)}
+}
+async function structuredAI(messages,tokens,verify){
+ let previous="",lastError=null;
+ for(let attempt=0;attempt<3;attempt++){
+  let input;
+  if(attempt===0)input=messages;
+  else input=[
+   {role:"system",content:"You are a strict JSON formatter. Your entire reply must be one valid JSON object with double-quoted keys and strings, NO markdown, NO commentary, no trailing commas. Preserve the intended factual content. If original text is truncated, produce a concise complete answer satisfying the exact requested schema and scene count. Any double quotes inside strings must be escaped."},
+   {role:"user",content:"Original task:\n"+messages.map(m=>m.content).join("\n").slice(0,14500)+"\n\nMalformed result to correct:\n"+previous.slice(0,18000)+"\nReturn valid JSON only."}
+  ];
+  previous=await textAI(input,tokens,true);
+  try{
+   const parsed=parseJSON(previous);
+   if(!verify(parsed))throw Error("JSON صالح لكن حقوله أو عدد مشاهده غير مطابق");
+   return parsed;
+  }catch(e){lastError=e}
  }
+ throw Error("تعذر الحصول على تقرير JSON صالح بعد المحاولات. "+err(lastError));
 }
 function clipDurationAt(index,total){return index===total-1?15:15}
 $("analyzeFilm").onclick=async()=>{
@@ -117,8 +149,7 @@ $("analyzeFilm").onclick=async()=>{
   const scope=requested==="auto"?
   "Choose appropriate target_seconds from [180,240,300,600] based on narrative complexity, dialogue and pacing. Prefer 240 or 300 for a coherent full story.":
   "Set target_seconds exactly to "+requested+".";
-  const m=await textAI([{role:"system",content:"You are an Iraqi film director and story analyst. Return ONLY compact JSON, no markdown, with keys title, synopsis (Arabic), target_seconds (integer). "+scope+" Retain the sequence of cause then reaction. No generation."},{role:"user",content:story}],650);
-  const meta=parseJSON(m);
+  const meta=await structuredAI([{role:"system",content:"You are an Iraqi film director and story analyst. Return ONLY compact valid JSON with exactly keys title (string), synopsis (Arabic string), target_seconds (integer). "+scope+" Retain the sequence of cause then reaction. Do not include unescaped quotes. No video generation."},{role:"user",content:story}],950,o=>!!o&&typeof o.title==="string"&&typeof o.synopsis==="string"&&Number.isFinite(Number(o.target_seconds)));
   const permitted=[180,240,300,600];
   const seconds=Number(requested==="auto"?meta.target_seconds:requested);
   if(!permitted.includes(seconds))throw Error("مدة الفيلم غير مدعومة. اخترها يدوياً وأعد التحليل");
@@ -128,8 +159,8 @@ $("analyzeFilm").onclick=async()=>{
    const batch=Math.min(8,count-start);
    report("filmAnalyzeStatus","المرحلة 2/2: كتابة المشاهد "+(start+1)+" إلى "+(start+batch)+" من "+count+"…");
    const system="You are an expert Iraqi cinematic storyboard writer. Return ONLY JSON {\"scenes\":[{\"prompt\":\"...\"}]}. EXACTLY "+batch+" scene objects. Each scene is a 15-second cinematic HeyGen video prompt. Write technical directions in English, but exact spoken dialogue in Iraqi Arabic quotes, short enough for 15 seconds. Use the same fixed character appearance, hair, clothes, environment, voice tone across shots. Each action must occur BEFORE its reaction. This batch is part of a "+seconds+"-second film. Output numbered beats "+(start+1)+" through "+(start+batch)+" only. Keep each prompt 60–100 words.";
-   const t=await textAI([{role:"system",content:system},{role:"user",content:"STORY:\n"+story+"\nTitle: "+(meta.title||"Iraqi film")+"\nSummary: "+(meta.synopsis||"")+"\nScenes already scripted: "+scenes.map((x,i)=>(i+1)+": "+x.prompt.slice(0,180)).join("\n")}],Math.min(4300,1200+batch*210));
-   const part=parseJSON(t).scenes;
+   const result=await structuredAI([{role:"system",content:system},{role:"user",content:"STORY:\n"+story+"\nTitle: "+(meta.title||"Iraqi film")+"\nSummary: "+(meta.synopsis||"")+"\nScenes already scripted: "+scenes.map((x,i)=>(i+1)+": "+x.prompt.slice(0,180)).join("\n")}],Math.min(5200,1500+batch*280),o=>Array.isArray(o?.scenes)&&o.scenes.length===batch&&o.scenes.every(s=>typeof s.prompt==="string"&&s.prompt.length>25));
+   const part=result.scenes;
    if(!Array.isArray(part)||part.length!==batch)throw Error("المساعد أنشأ "+(part?.length||0)+" بدلاً من "+batch+" مشاهد في الدفعة؛ لم يتم اعتماد الخطة");
    part.forEach((s,i)=>scenes.push({id:"S"+String(start+i+1).padStart(3,"0"),duration:clipDurationAt(start+i,count),prompt:String(s.prompt||"").trim(),status:"pending",jobId:null,cost:null}));
   }
