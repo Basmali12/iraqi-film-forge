@@ -73,7 +73,7 @@ function refresh(){
  $("filmPercent").textContent=Math.round(progress)+"%";
  $("filmProgress").style.width=progress+"%";
  $("filmStage").textContent=done===scenes.length?"جميع المشاهد جاهزة":"اكتمل "+done+" من "+scenes.length+" مشهداً";
- $("filmApprove").disabled=!!project.approved;
+ renderCharacters();
  $("filmApprovalStatus").textContent=project.approved?"تم اعتماد خطة الفيلم":"بانتظار موافقتك على الإنتاج";
  $("productionPanel").hidden=!project.approved;
  $("filmResume").disabled=running||done===scenes.length;
@@ -134,6 +134,94 @@ async function structuredAI(messages,tokens,verify){
  }
  throw Error("تعذر الحصول على تقرير JSON صالح بعد المحاولات. "+err(lastError));
 }
+// Character engine: identity is a structured, user-approved plan, never a text-only guarantee.
+const CHARACTER_TYPES=["historical_public","fictional","unknown"];
+const STYLE_TYPES=["anime","realistic","3d","hybrid"];
+function styleFromStory(story){
+  if(/\b(anime|manga|2\.5d)\b|أنمي|انمي/i.test(story))return "anime";
+  if(/\b(3d|cgi)\b|ثلاثي الأبعاد/i.test(story))return "3d";
+  return "realistic";
+}
+function safeCharacters(raw,story){
+  if(!Array.isArray(raw)||raw.length===0||raw.length>30)throw Error("المساعد لم يعطِ قائمة شخصيات صحيحة");
+  const style=styleFromStory(story);
+  return raw.map((c,i)=>{
+    const name=String(c.display_name||c.name||"").trim().slice(0,150);
+    if(!name)throw Error("شخصية بلا اسم");
+    const id="CHAR_"+String(i+1).padStart(3,"0");
+    const category=CHARACTER_TYPES.includes(c.category)?c.category:"unknown";
+    const ages=Array.isArray(c.age_variants)?c.age_variants.slice(0,8):[];
+    return {id,display_name:name,category,
+      visual_description:String(c.visual_description||"").slice(0,1000),
+      classification_reason:String(c.classification_reason||"").slice(0,300),
+      voice_description:String(c.voice_description||"").slice(0,250),
+      style_target:style,
+      age_variants:ages.map(a=>({label:String(a.label||"المرحلة العمرية"),approx_age:Number(a.approx_age)||0,description:String(a.description||"").slice(0,400)})),
+      reference_url:"",approved:false};
+  });
+}
+async function analyzeCharacters(story){
+  report("filmAnalyzeStatus","تحليل الشخصيات والأعمار والملامح المطلوبة…");
+  const instruction="You are a historical film casting and visual continuity assistant. Extract recurring named characters, not generic crowd members. Return one JSON object {\"characters\":[{\"display_name\":\"name\",\"category\":\"historical_public|fictional|unknown\",\"classification_reason\":\"Arabic reason\",\"visual_description\":\"distinctive physical appearance / immutable traits in English\",\"voice_description\":\"voice continuity directions\",\"age_variants\":[{\"label\":\"stage\",\"approx_age\":35,\"description\":\"wardrobe, hair, face for the stage\"}]}]}. For any recognizable real historical person (e.g. Saddam Hussein) classify historical_public. Do not invent verified source photographs or claim exact face likeness; this is a text plan awaiting references. For age changes, keep stable identity features and describe changes historically cautiously. Only extract persons actually in story. Use historically appropriate wardrobes and requested art style.";
+  const response=await structuredAI([{role:"system",content:instruction},{role:"user",content:story}],3200,o=>Array.isArray(o?.characters)&&o.characters.length>0);
+  return safeCharacters(response.characters,story);
+}
+function identityBrief(character){
+  const ages=character.age_variants.map(a=>a.label+" ("+a.approx_age+"): "+a.description).join("; ");
+  return "["+character.id+": "+character.display_name+" | "+character.category+" | "+character.style_target+" visual style | "+character.visual_description+" | Age versions: "+ages+" | Voice: "+character.voice_description+"]. ";
+}
+function characterPromptForScene(scene,characters){
+  const inScene=characters.filter(c=>!Array.isArray(scene.character_ids)||!scene.character_ids.length||scene.character_ids.includes(c.id));
+  return "IDENTITY LOCK (continuity reference descriptions, not guarantee of likeness). "+
+    inScene.map(identityBrief).join(" ")+" Keep the same character anatomy and features as approved. "+
+    "Age and clothing must match the described year. Preserve original action order. "+
+    scene.prompt;
+}
+function charactersApproved(){return !!project&&(project.characters||[]).length>0&&project.charactersApproved===true}
+function renderCharacters(){
+  const panel=$("characterPanel"),list=$("characterList");
+  if(!project?.characters?.length){panel.hidden=true;return}
+  panel.hidden=false;list.replaceChildren();
+  const frozen=project.charactersApproved||project.approved;
+  for(const char of project.characters){
+    const card=document.createElement("div");card.className="fscene character-card";
+    const heading=document.createElement("div");heading.className="head";
+    const title=document.createElement("strong");title.textContent=char.display_name+" · "+(char.category==="historical_public"?"شخصية تاريخية":char.category==="fictional"?"خيالية":"غير مؤكدة");
+    const tag=document.createElement("small");tag.textContent=char.style_target==="anime"?"أنمي":char.style_target==="realistic"?"واقعي":char.style_target;
+    heading.append(title,tag);card.append(heading);
+    const reason=document.createElement("p");reason.className="note";reason.textContent=char.classification_reason;card.append(reason);
+    const details=document.createElement("label");details.textContent="الملامح الثابتة";card.append(details);
+    const description=document.createElement("textarea");description.rows=3;description.value=char.visual_description;description.disabled=frozen;
+    description.onchange=()=>{char.visual_description=description.value.trim();saveProject().catch(()=>{})};
+    card.append(description);
+    const variants=document.createElement("p");variants.className="note";
+    variants.textContent="المراحل العمرية: "+(char.age_variants.map(a=>a.label+" ("+a.approx_age+")").join("، ")||"غير محددة");card.append(variants);
+    const lbl=document.createElement("label");lbl.textContent="رابط صورة مرجعية مباشرة HTTPS (اختياري، صورة واحدة لكل شخصية)";card.append(lbl);
+    const inp=document.createElement("input");inp.type="url";inp.placeholder="https://example.com/portrait.jpg";inp.value=char.reference_url||"";inp.disabled=frozen;
+    inp.onchange=()=>{char.reference_url=inp.value.trim();saveProject().catch(()=>{})};
+    card.append(inp);list.append(card);
+  }
+  $("approveCharacters").disabled=frozen;
+  $("characterStatus").textContent=project.charactersApproved?
+    "✓ تم اعتماد هوية الشخصيات. تخطيط المشاهد والقصة جاهز للمراجعة.":
+    "راجع الملامح والمراحل العمرية ثم اضغط اعتماد. الصورة المرجعية تحسن الاتساق لكنها ما تضمن التطابق.";
+  $("filmApprove").disabled=!charactersApproved()||!!project.approved;
+}
+$("approveCharacters").onclick=async()=>{
+ if(!project?.characters?.length||project.charactersApproved)return;
+ for(const c of project.characters){
+   if(!c.visual_description.trim())return report("characterStatus","أكمل وصف ملامح "+c.display_name);
+   if(c.reference_url&&!/^https:\/\/[^ ]+/i.test(c.reference_url))return report("characterStatus","رابط الصورة يجب أن يبدأ بـ https://");
+ }
+ if(!confirm("توافق على وصف جميع الشخصيات ومراحلها العمرية؟ النص وحده لا يضمن التطابق، وروابط الصور اختيارية."))return;
+ project.charactersApproved=true;
+ await saveProject();renderCharacters();refresh();$("reportPanel").scrollIntoView({behavior:"smooth"});
+};
+$("editCharacters").onclick=async()=>{
+ if(!project||project.approved)return report("characterStatus","تم اعتماد الإنتاج؛ لسلامة الاستمرارية لا تعدل الشخصيات بعد موافقة التوليد.");
+ project.charactersApproved=false;await saveProject();renderCharacters();refresh();
+};
+
 function clipDurationAt(index,total){return index===total-1?15:15}
 $("analyzeFilm").onclick=async()=>{
  if(!apiKey)return report("filmAnalyzeStatus","اربط OpenRouter أولاً");
@@ -150,23 +238,24 @@ $("analyzeFilm").onclick=async()=>{
   const rawSeconds=Number(meta.target_seconds);
   if(!Number.isFinite(rawSeconds)||rawSeconds<30||rawSeconds>600)throw Error("الذكاء اقترح مدة خارج حدود النسخة التجريبية (30–600 ثانية). أعد التحليل بتوضيح إيقاع القصة.");
   const seconds=Math.max(30,Math.min(600,Math.round(rawSeconds/15)*15));
+  const characters=await analyzeCharacters(story);
   const count=seconds/15,scenes=[];
   // Work in groups of 8 to prevent output truncation on films with 20–40 scenes.
   for(let start=0;start<count;start+=8){
    const batch=Math.min(8,count-start);
    report("filmAnalyzeStatus","المرحلة 2/2: كتابة المشاهد "+(start+1)+" إلى "+(start+batch)+" من "+count+"…");
-   const system="You are an expert Iraqi cinematic storyboard writer. Return ONLY JSON {\"scenes\":[{\"prompt\":\"...\"}]}. EXACTLY "+batch+" scene objects. Each scene is a 15-second cinematic HeyGen video prompt. Write technical directions in English, but exact spoken dialogue in Iraqi Arabic quotes, short enough for 15 seconds. Use the same fixed character appearance, hair, clothes, environment, voice tone across shots. Each action must occur BEFORE its reaction. This batch is part of a "+seconds+"-second film. Output numbered beats "+(start+1)+" through "+(start+batch)+" only. Keep each prompt 60–100 words.";
-   const result=await structuredAI([{role:"system",content:system},{role:"user",content:"STORY:\n"+story+"\nTitle: "+(meta.title||"Iraqi film")+"\nSummary: "+(meta.synopsis||"")+"\nScenes already scripted: "+scenes.map((x,i)=>(i+1)+": "+x.prompt.slice(0,180)).join("\n")}],Math.min(5200,1500+batch*280),o=>Array.isArray(o?.scenes)&&o.scenes.length===batch&&o.scenes.every(s=>typeof s.prompt==="string"&&s.prompt.length>25));
+   const system="You are an expert Iraqi cinematic storyboard writer. Include character_ids with IDs from the approved character registry.  Return ONLY JSON {\"scenes\":[{\"prompt\":\"...\",\"character_ids\":[\"CHAR_001\"]}]}. EXACTLY "+batch+" scene objects. Each scene is a 15-second cinematic HeyGen video prompt. Write technical directions in English, but exact spoken dialogue in Iraqi Arabic quotes, short enough for 15 seconds. Use the same fixed character appearance, hair, clothes, environment, voice tone across shots. Each action must occur BEFORE its reaction. This batch is part of a "+seconds+"-second film. Output numbered beats "+(start+1)+" through "+(start+batch)+" only. Keep each prompt 60–100 words.";
+   const result=await structuredAI([{role:"system",content:system},{role:"user",content:"STORY:\n"+story+"\nTitle: "+(meta.title||"Iraqi film")+"\nSummary: "+(meta.synopsis||"")+"\nCHARACTER REGISTRY:\n"+characters.map(c=>identityBrief(c)).join("\n")+"\nScenes already scripted: "+scenes.map((x,i)=>(i+1)+": "+x.prompt.slice(0,180)).join("\n")}],Math.min(5200,1500+batch*280),o=>Array.isArray(o?.scenes)&&o.scenes.length===batch&&o.scenes.every(s=>typeof s.prompt==="string"&&s.prompt.length>25));
    const part=result.scenes;
    if(!Array.isArray(part)||part.length!==batch)throw Error("المساعد أنشأ "+(part?.length||0)+" بدلاً من "+batch+" مشاهد في الدفعة؛ لم يتم اعتماد الخطة");
-   part.forEach((s,i)=>scenes.push({id:"S"+String(start+i+1).padStart(3,"0"),duration:clipDurationAt(start+i,count),prompt:String(s.prompt||"").trim(),status:"pending",jobId:null,cost:null}));
+   part.forEach((s,i)=>scenes.push({id:"S"+String(start+i+1).padStart(3,"0"),duration:clipDurationAt(start+i,count),prompt:String(s.prompt||"").trim(),character_ids:Array.isArray(s.character_ids)?s.character_ids.filter(id=>characters.some(c=>c.id===id)):[],status:"pending",jobId:null,cost:null}));
   }
   if(scenes.some(x=>x.prompt.length<25))throw Error("هناك مشهد فارغ في خطة الذكاء");
   // New project: old media keys are version-scoped to avoid accidental film mixing.
-  project={version:1,title:String(meta.title||"فيلم عراقي"),synopsis:String(meta.synopsis||""),story,scenes,
+  project={version:2,characters,charactersApproved:false,title:String(meta.title||"فيلم عراقي"),synopsis:String(meta.synopsis||""),story,scenes,
    rate:rate(),resolution:$("filmQuality").value,ratio:$("filmRatio").value,approved:false,spent:0,created:Date.now()};
   await saveProject();refresh();stage("planning");
-  $("reportPanel").scrollIntoView({behavior:"smooth"});
+  $("characterPanel").scrollIntoView({behavior:"smooth"});
   report("filmAnalyzeStatus","✓ جاهز: "+count+" مشهداً، مدة "+(seconds/60)+" دقائق. راجع التقرير قبل الموافقة.");
  }catch(e){report("filmAnalyzeStatus","تعذر تحليل القصة: "+err(e)+" — لم يبدأ أي توليد فيديو")}
  finally{btn.disabled=false}
@@ -175,6 +264,7 @@ $("filmReject").onclick=()=>{$("storyPanel").scrollIntoView({behavior:"smooth"})
 $("filmExportPlan").onclick=()=>{if(project)dlFile("film-report.json",new Blob([JSON.stringify({...project,apiKey:undefined},null,2)],{type:"application/json"}))};
 $("filmApprove").onclick=async()=>{
  if(!project||project.approved)return;
+ if(!charactersApproved())return report("filmApprovalStatus","اعتمد الشخصيات أولاً قبل موافقة التوليد");
  let seconds=project.scenes.reduce((a,s)=>a+s.duration,0);
  let approx=seconds*project.rate;
  if(!confirm("توافق على خطة من "+project.scenes.length+" مشهداً، بإجمالي "+seconds+" ثانية؟ التكلفة المرجعية تبدأ من "+money(approx)+". الأسعار ليست سقفاً مضموناً، ولا يبدأ التوليد إلا إذا ضغطت «بدء التوليد» بعدها."))return;
@@ -219,7 +309,7 @@ async function finishPending(i){
  throw Error("مهمة "+id+" ما زالت قيد التنفيذ. لا تنشئ طلباً جديداً؛ استأنف المراقبة لاحقاً")
 }
 async function startFilm(){
- if(!project?.approved||running||mergeBusy)return;
+ if(!project?.approved||!charactersApproved()||running||mergeBusy)return;
  if(!apiKey)return report("filmRuntimeStatus","اربط المفتاح أولاً");
  const done=project.scenes.filter(s=>s.status==="done").length;
  const pending=project.scenes.length-done;
@@ -237,14 +327,19 @@ async function startFilm(){
     const budget=project.scenes.reduce((a,x)=>a+x.duration,0)*project.rate*1.3;
     if(project.spent+estimatedNext>budget)
       throw Error("توقفنا لأن الكلفة المقدرة تجاوزت 130% من سعر التقرير. راجع الرصيد والسعر الفعلي قبل المتابعة.");
-    const request={model:MODEL,prompt:s.prompt,duration:s.duration,resolution:project.resolution,aspect_ratio:project.ratio};
+    const request={model:MODEL,prompt:characterPromptForScene(s,project.characters),duration:s.duration,resolution:project.resolution,aspect_ratio:project.ratio};
+    const sceneCharacters=project.characters.filter(c=>!s.character_ids?.length||s.character_ids.includes(c.id));
     if(i>0){
       let previous=await storageGet("clip-"+(i-1));
       if(!previous)throw Error("المشهد السابق غير محفوظ. لا يمكن الاستكمال بدون الفريم");
       stage("continuation");report("filmRuntimeStatus","استخراج آخر فريم للمشهد "+i+"…");
       let img=await frameFromBlob(previous);
       request.frame_images=[{type:"image_url",image_url:{url:img},frame_type:"first_frame"}];
-    }else stage("generation");
+    }else{
+      stage("generation");
+      const image=sceneCharacters.find(c=>c.reference_url)?.reference_url;
+      if(image)request.frame_images=[{type:"image_url",image_url:{url:image},frame_type:"first_frame"}];
+    }
     report("filmRuntimeStatus","إرسال طلب المشهد "+(i+1)+" (مدفوع)...");
     // Do not retry submit on network errors: the server may already have charged.
     let response=await api("/videos",{method:"POST",payload:request});
