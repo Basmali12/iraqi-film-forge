@@ -57,3 +57,63 @@ function updatePrice(){
 }
 $("resolution").onchange=updatePrice;$("duration").onchange=updatePrice;updatePrice();
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+
+async function lastFrame(clip){
+ const video=document.createElement("video"),url=URL.createObjectURL(clip);video.muted=true;video.playsInline=true;
+ try{
+  video.src=url;
+  await new Promise((resolve,reject)=>{video.onloadedmetadata=resolve;video.onerror=()=>reject(Error("تعذر تحميل الفيديو السابق"))});
+  video.currentTime=Math.max(0,video.duration-0.12);
+  await new Promise((resolve,reject)=>{video.onseeked=resolve;video.onerror=()=>reject(Error("تعذر استخراج الفريم"))});
+  const canvas=document.createElement("canvas"),scale=Math.min(1,1024/Math.max(video.videoWidth,video.videoHeight));
+  canvas.width=Math.max(1,Math.round(video.videoWidth*scale));canvas.height=Math.max(1,Math.round(video.videoHeight*scale));
+  canvas.getContext("2d").drawImage(video,0,0,canvas.width,canvas.height);
+  return canvas.toDataURL("image/jpeg",0.85)
+ }finally{video.src="";URL.revokeObjectURL(url)}
+}
+async function generateVideo(prompt,duration,resolution,aspectRatio,tail){
+ let request={model:VIDEO_MODEL,prompt,duration,resolution,aspect_ratio:aspectRatio};
+ if(tail){
+  status("videoStatus","جاري استخراج آخر فريم للفيديو السابق...");
+  const image=await lastFrame(tail);
+  request.frame_images=[{type:"image_url",image_url:{url:image},frame_type:"first_frame"}]
+ }
+ status("videoStatus","جاري إرسال طلب HeyGen المدفوع...");
+ const submitted=await api("/videos",{method:"POST",body:request});
+ if(!submitted.id)throw Error("لم يصل معرف الفيديو. تحقق من رصيدك قبل إعادة الطلب.");
+ let id=encodeURIComponent(submitted.id);
+ for(let i=0;i<120;i++){
+  await sleep(7000);
+  let result=await api("/videos/"+id);
+  status("videoStatus","مهمة "+submitted.id+" - الحالة: "+result.status+
+   (result.usage&&result.usage.cost!=null?" - الكلفة $"+result.usage.cost:""));
+  if(result.status==="completed"){
+   let video=await api("/videos/"+id+"/content",{binary:true});
+   if(!video.size)throw Error("مقطع الفيديو الناتج فارغ");
+   return {blob:video,id:submitted.id,cost:result.usage&&result.usage.cost}
+  }
+  if(["failed","cancelled","expired"].includes(result.status))
+   throw Error("فشلت المهمة "+submitted.id+": "+String(result.error||result.status))
+ }
+ throw Error("انتهت مهلة الانتظار. مهمة "+submitted.id+" قد تستمر؛ لا تكرر التوليد قبل التحقق منها.")
+}
+$("generate").onclick=async()=>{
+ if(!key||generating)return;
+ let prompt=$("prompt").value.trim(),duration=Number($("duration").value);
+ let resolution=$("resolution").value,ratio=$("ratio").value,tail=$("carry").checked?currentClip:null;
+ if(prompt.length<8)return status("videoStatus","البرومبت قصير");
+ if($("carry").checked&&!tail)return status("videoStatus","ماكو فيديو سابق للاستكمال");
+ let rate=resolution==="480p"?0.01:0.018;
+ if(!confirm("إنشاء فيديو مدفوع من HeyGen Video فقط. "+duration+" ثانية بدقة "+resolution+
+   ". السعر المرجعي يبدأ من $"+(duration*rate).toFixed(2)+"، وقد يزيد أو يتغير. موافق؟"))return;
+ generating=true;$("generate").disabled=true;
+ try{
+  let r=await generateVideo(prompt,duration,resolution,ratio,tail);
+  currentClip=r.blob;if(currentURL)URL.revokeObjectURL(currentURL);
+  currentURL=URL.createObjectURL(r.blob);
+  $("player").src=currentURL;$("download").href=currentURL;
+  $("download").download="heygen-"+String(r.id).slice(0,17)+".mp4";
+  $("result").hidden=false;status("videoStatus","تم إنشاء الفيديو ✓ "+(r.cost!=null?"الكلفة الفعلية $"+r.cost:""))
+ }catch(e){status("videoStatus","خطأ: "+errorText(e)+" — افحص حالة المهمة قبل إنشاء طلب جديد")}
+ finally{generating=false;$("generate").disabled=false}
+};
