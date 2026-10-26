@@ -1,0 +1,14 @@
+{
+  "name": "iraqi-film-forge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Independent Iraqi film maker on OpenRouter and Forge Film",
+  "scripts": {
+    "start": "node server.mjs",
+    "check": "node --check site/app.js && node --check server.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
