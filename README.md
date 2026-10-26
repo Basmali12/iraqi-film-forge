@@ -1,27 +1,51 @@
 # Iraqi Film Forge — ستوديو الأفلام العراقي
 
-Independent project for cinematic Iraqi-language video production. **Not connected to Mashhad**.
+**موقع مستقل تماماً عن مشروع «مشهد».** منصة تجريبية شخصية لصناعة فيديوهات HeyGen عبر OpenRouter وتحويل القصص العراقية إلى خطة مشاهد مرتبطة بنظام Forge Film.
 
-## Project goals
-- OpenRouter BYOK frontend; API key must never be committed.
-- **Video model locked to** `heygen/heygen-video-1`.
-- Text chat for writing storyboards using a separate low-cost text model.
-- Manual paid-generation confirmation; 5–15-second scenes.
-- Save final frames to seed subsequent clips (image-to-video). Face continuity is **not guaranteed**.
-- `F-R-L/forge-film` (MIT) serves as orchestration foundation for story DAG, scene scheduling and continuity.
-- FFmpeg merge retains audio and dialogue.
+## افتح المشروع
+**Live GitHub Pages:** https://basmali12.github.io/iraqi-film-forge/
 
-## Deploy
-Frontend files are published separately on the `gh-pages` branch. For the first deployment open **Settings → Pages → Deploy from a branch → gh-pages → / (root) → Save**.
+**المصدر البرمجي:** https://github.com/Basmali12/iraqi-film-forge
 
-Expected page: https://basmali12.github.io/iraqi-film-forge/
+### الموجود حالياً
+- واجهة عربية للهاتف تحت `site/`، منسوخة أيضاً إلى فرع النشر `gh-pages`.
+- حقل ربط مفتاح OpenRouter مؤقت بذاكرة الصفحة، بدون تخزين المفتاح في GitHub.
+- دردشة مع نموذج نصي منفصل `openai/gpt-4.1-nano`.
+- توليد فيديو عبر النموذج **`heygen/heygen-video-1` فقط**؛ طلب الدفع يتطلب موافقة صريحة.
+- إنشاء خطة قصص 45 ثانية أو 3 أو 10 دقائق، مع تصدير `storyboard.json`.
+- استكمال من آخر فريم على أساس صورة بداية (ليس تمديداً زمنياً مضموناً).
+- خادم محلي Node.js (`server.mjs`) يمكّن نفس الواجهة من الاتصال بأمان نسبي من جهازك بدون مشاكل CORS للمتصفح.
+- منظومة Forge Film المستقلة ضمن `vendor/forge-film/`، مع الكود المصدري البرمجي وملف ترخيص MIT؛ حُفظت 61 ملفاً نصياً أصلياً، باستثناء صور توثيقية غير لازمة للتشغيل.
+- `forge_bridge/openrouter_heygen.py`: موزع HeyGen متوافق مع Forge `BasePipeline`.
+- `tools/forge_run.py`: تشغيل مشاهد متسلسلة وإعادة استخدام أرقام الطلبات.
+- `tools/assemble.py`: دمج المقاطع مع الاحتفاظ بالصوت باللهجة العراقية.
 
-GitHub Pages is static hosting; automatic server-side Forge/FFmpeg workflows require Node/Python deployment on an authorized server. Users enter their own OpenRouter key only into the trusted live app; the key is not included in the repo.
+### تشغيل محلي
+متطلبات Node.js 20+ وPython 3.11+ وFFmpeg إذا تريد إنتاج فيلم كامل.
 
-## Upstream acknowledgments
-Forge Film © respective upstream authors. MIT: https://github.com/F-R-L/forge-film — retain the MIT copyright and license with any vendored copy.
+```bash
+npm start
+```
+ثم افتح `http://127.0.0.1:3000`.
 
-## Local full source package
-The original self-contained project package includes Node server, browser frontend, Forge adapter and assemble tools. The repo deployment will be enhanced with these files; do not claim them to be present until pushed and verified.
+فحص سيناريو بلا صرف:
+```bash
+python tools/forge_run.py storyboard.json
+```
 
-See: https://github.com/Basmali12/iraqi-film-forge
+بعد التحقق من الأسعار الفعلية بالموديل وتحديد الحد المالي، يمكن تنفيذ توليد مدفوع بمفتاحك المحلي:
+```bash
+export OPENROUTER_API_KEY="your_private_key"
+python tools/forge_run.py storyboard.json --confirm-paid --max-budget-usd 3
+```
+
+### تنبيهات عملية
+- لا تنشر المفتاح داخل GitHub ولا تضعه بنص الدردشة.
+- صفحة GitHub Pages **ثابتة فقط**؛ لا تستطيع تشغيل Python وFFmpeg على الخادم ولا تضمن السماح بطلبات OpenRouter عبر CORS. جرّب الربط أولاً؛ إن رُفض اتصال المتصفح استخدم نسخة Node المحلية، أو انشر خلفية HTTPS مع مصادقة.
+- السعر المرجعي قديم/ترويجي وغير مضمون؛ راجع السعر قبل الدفع. خاصية Face Identity/Voice Consistency ليست مضمونة 100%.
+- توليد الفيديو الحقيقي عبر API **لم يُختبر بهذا الحساب**، ولم يُصرف منه رصيد.
+- زر التخطيط يولد ملف JSON؛ ربطه تلقائياً بخادم إنتاج طويل لم يُنشر بعد.
+- النسخة العامة غير جاهزة بعد لعرض خدمات اشتراكات أو استقبال مفاتيح زبائن متعددين.
+- آخر تحديث نسخ Forge Film المثبت في مشروعنا: `f67f0a003` (MIT). حقوقه وإشعارات الترخيص محفوظة.
+
+التعليمات لكودكس: `AGENTS.md`.
