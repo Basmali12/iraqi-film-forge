@@ -309,6 +309,7 @@ async function finishPending(i){
  throw Error("مهمة "+id+" ما زالت قيد التنفيذ. لا تنشئ طلباً جديداً؛ استأنف المراقبة لاحقاً")
 }
 async function startFilm(){
+ if(!project?.timelineVerified){report("filmRuntimeStatus","تم إيقاف التوليد المدفوع: مخطط القصة غير مثبت زمنياً وقد يكرر الأحداث. لا يتم إرسال طلبات فيديو جديدة.");return;}
  if(!project?.approved||!charactersApproved()||running||mergeBusy)return;
  if(!apiKey)return report("filmRuntimeStatus","اربط المفتاح أولاً");
  const done=project.scenes.filter(s=>s.status==="done").length;
