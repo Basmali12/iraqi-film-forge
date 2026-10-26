@@ -117,3 +117,34 @@ $("generate").onclick=async()=>{
  }catch(e){status("videoStatus","خطأ: "+errorText(e)+" — افحص حالة المهمة قبل إنشاء طلب جديد")}
  finally{generating=false;$("generate").disabled=false}
 };
+
+$("plan").onclick=async()=>{
+ let story=$("story").value.trim(),count=Math.ceil(Number($("filmDuration").value)/15);
+ if(!key||story.length<15)return status("planStatus","اربط المفتاح واكتب القصة أولاً");
+ if(!confirm("راح نستخدم النموذج النصي لكتابة "+count+" مشهد؛ لا يوجد توليد فيديو بهذا الزر. موافق؟"))return;
+ let btn=$("plan");btn.disabled=true;status("planStatus","جاري التخطيط...");
+ try{
+  let system="You are an expert Iraqi cinema screenwriter. Split the user story into EXACTLY "+
+   count+" shots of 15 seconds. Maintain identities, clothing, locations, chronological causality and Southern Iraqi dialogue. Return only valid JSON with schema {\"scenes\":[{\"id\":\"S001\",\"prompt\":\"English cinematic visual directions with Iraqi Arabic spoken dialogue in quotes\"}]} and no markdown.";
+  let r=await api("/chat/completions",{method:"POST",body:{model:CHAT_MODEL,messages:[{role:"system",content:system},{role:"user",content:story}],temperature:0.3,max_tokens:Math.min(12000,count*180+500)}});
+  let raw=String(r.choices[0].message.content||"").trim().replace(/^\x60{3}(?:json)?/,"").replace(/\x60{3}$/,"").trim();
+  let plan=JSON.parse(raw);if(!Array.isArray(plan.scenes)||!plan.scenes.length)throw Error("الخطة غير صالحة");
+  storyboard=plan.scenes.map((s,i)=>({id:s.id||"S"+String(i+1).padStart(3,"0"),prompt:String(s.prompt||""),duration:15}));
+  $("scenes").replaceChildren();
+  storyboard.forEach((scene,i)=>{
+   let container=document.createElement("div"),label=document.createElement("b"),
+     area=document.createElement("textarea"),button=document.createElement("button");
+   container.className="scene";label.textContent="المشهد "+(i+1);area.rows=3;area.value=scene.prompt;
+   area.oninput=()=>scene.prompt=area.value;button.textContent="نسخ إلى مولّد الفيديو";
+   button.onclick=()=>{$("prompt").value=scene.prompt;$("duration").value="15";updatePrice();scrollTo({top:0,behavior:"smooth"})};
+   container.append(label,area,button);$("scenes").appendChild(container)
+  });
+  $("savePlan").disabled=false;status("planStatus","تم إعداد "+storyboard.length+" مشهد للمراجعة ✓")
+ }catch(e){status("planStatus","فشل تجهيز القصة: "+errorText(e)+" — قسم القصة إلى أجزاء أقصر")}
+ finally{btn.disabled=false}
+};
+$("savePlan").onclick=()=>{
+ let blob=new Blob([JSON.stringify({model:VIDEO_MODEL,scenes:storyboard},null,2)],{type:"application/json"}),
+ url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="storyboard.json";a.click();
+ setTimeout(()=>URL.revokeObjectURL(url),5000)
+};
