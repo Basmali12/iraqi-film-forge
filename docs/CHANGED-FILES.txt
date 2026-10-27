@@ -1,0 +1,82 @@
+File inventory — local Modal engine implementation
+Branch: codex/modal-engine-management
+Stable main base: 17c7fa2db8f75def8cbf82a8d4fff367a898f432
+No push or deployment.
+
+MODIFIED (12)
+.env.example
+.github/workflows/verify.yml
+.gitignore
+AGENTS.md
+README.md
+package.json
+server.mjs
+site/director.html
+site/director.js
+site/film.html
+site/index.html
+tools/forge_run.py
+
+ADDED (55)
+docs/CHANGED-FILES.txt
+docs/ENGINE-MANAGEMENT-REPORT.txt
+docs/ENGINE-SETUP.txt
+docs/build-validation.log
+docs/node-validation.log
+docs/preview/cost-guard-ui-test.png
+docs/preview/desktop-ui-test.png
+docs/preview/mobile-ui-test.png
+docs/python-validation.log
+docs/read-only-inspection.json
+docs/verification.json
+engine/api.mjs
+engine/config.mjs
+engine/contracts.ts
+engine/gpu_host.py
+engine/keyring.mjs
+engine/modal_bridge.py
+engine/provider.mjs
+engine/requirements-local.lock
+engine/requirements-test.lock
+engine/requirements-transfer.lock
+engine/runtime/benchmark_image.py
+engine/runtime/build-requirements.lock
+engine/runtime/cloud_output.py
+engine/runtime/engine.py
+engine/runtime/gpu_service.py
+engine/runtime/planner.py
+engine/runtime/requirements-remote.lock
+engine/runtime/residency.py
+engine/runtime/settings.py
+engine/runtime/source-manifest.json
+engine/runtime/story-full.json
+engine/runtime/story-horror.json
+engine/runtime/story-short.json
+engine/runtime/story.py
+engine/runtime/telemetry.py
+engine/runtime/weights.py
+engine/setup.mjs
+engine/store.mjs
+package-lock.json
+site/engine-client.js
+site/engine-endpoint.js
+site/engines.css
+site/engines.html
+site/engines.js
+site/modal-director.js
+tests/browser-guards.test.mjs
+tests/engine.test.mjs
+tests/fixtures/dry-storyboard.json
+tests/test_engine_runtime.py
+tests/visual-server.mjs
+tools/build.mjs
+tools/check.mjs
+tools/inspect-modal.mjs
+tsconfig.json
+
+DELETED (0)
+None
+
+Preserved: vendor/forge-film/**, original app.js/film.js/stitcher.js, existing local projects, sibling modal-ltx25-test and all successful videos.
+Ignored and excluded: node_modules, .venv-engine, dist, private databases, keys, tokens, MP4 and model weights.
+Credential-pattern scan: no unexpected matches outside explicitly fake test fixtures; no values printed.

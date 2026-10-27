@@ -1,0 +1,158 @@
+{
+  "name": "full",
+  "duration_seconds": 30,
+  "frames": 721,
+  "scene": "One continuous cinematic camera take in a Baghdad bookshop on Al-Mutanabbi Street at golden hour. A young Iraqi man in a blue linen shirt stands with a kind elderly Iraqi bookseller with a grey moustache and beige shirt. Both remain in view, with a slow smooth camera move, warm consistent light, wooden shelves and plain book covers. Natural synchronized speech and quiet street ambience, realistic faces and hands.",
+  "events": [
+    {
+      "id": "full-01",
+      "before": "The blue book lies closed on the counter. Both men stand calmly with empty hands.",
+      "action": "The young man points once at the blue book and asks for a gift for his mother.",
+      "after": "The young man points towards the blue book; it is still closed on the counter.",
+      "dialogue": [
+        {
+          "speaker": "The young man",
+          "text": "عمو، أريد هدية لأمي."
+        }
+      ],
+      "completed_before": [],
+      "start_frame": 0,
+      "end_frame": 121
+    },
+    {
+      "id": "full-02",
+      "before": "The young man points towards the blue book; it is still closed on the counter.",
+      "action": "The bookseller opens the blue book on the counter, revealing a dried red rose between the pages.",
+      "after": "The blue book is open on the counter, with a dried red rose resting between its pages.",
+      "dialogue": [
+        {
+          "speaker": "The elderly bookseller",
+          "text": "شوف، حتى الوردة بعدها بيه."
+        }
+      ],
+      "completed_before": [
+        "full-01"
+      ],
+      "start_frame": 121,
+      "end_frame": 217
+    },
+    {
+      "id": "full-03",
+      "before": "The blue book is open on the counter, with a dried red rose resting between its pages.",
+      "action": "The young man leans slightly forward to examine the rose without touching it.",
+      "after": "The young man looks at the dried rose on the open book; both hands rest away from it.",
+      "dialogue": [
+        {
+          "speaker": "The young man",
+          "text": "هاي الوردة منين؟"
+        }
+      ],
+      "completed_before": [
+        "full-01",
+        "full-02"
+      ],
+      "start_frame": 217,
+      "end_frame": 313
+    },
+    {
+      "id": "full-04",
+      "before": "The young man looks at the dried rose on the open book; both hands rest away from it.",
+      "action": "The bookseller gently lifts the dried rose and looks at it with a tender smile.",
+      "after": "The elderly bookseller gently holds the dried rose; the open blue book stays on the counter.",
+      "dialogue": [
+        {
+          "speaker": "The elderly bookseller",
+          "text": "هاي أمي خلتها هنا من زمان."
+        }
+      ],
+      "completed_before": [
+        "full-01",
+        "full-02",
+        "full-03"
+      ],
+      "start_frame": 313,
+      "end_frame": 409
+    },
+    {
+      "id": "full-05",
+      "before": "The elderly bookseller gently holds the dried rose; the open blue book stays on the counter.",
+      "action": "The young man gestures kindly for the bookseller to keep the rose, then lowers his hand.",
+      "after": "The young man leaves the rose with the elderly bookseller, who holds it near his chest.",
+      "dialogue": [
+        {
+          "speaker": "The young man",
+          "text": "خليها يمك، هاي ذكرى غالية."
+        }
+      ],
+      "completed_before": [
+        "full-01",
+        "full-02",
+        "full-03",
+        "full-04"
+      ],
+      "start_frame": 409,
+      "end_frame": 505
+    },
+    {
+      "id": "full-06",
+      "before": "The young man leaves the rose with the elderly bookseller, who holds it near his chest.",
+      "action": "The bookseller places the rose on a high shelf, closes the blue book, and hands the book to the young man once.",
+      "after": "The rose rests on a high shelf. The young man holds the closed blue book against his chest.",
+      "dialogue": [
+        {
+          "speaker": "The elderly bookseller",
+          "text": "والكتاب هدية لأمك."
+        }
+      ],
+      "completed_before": [
+        "full-01",
+        "full-02",
+        "full-03",
+        "full-04",
+        "full-05"
+      ],
+      "start_frame": 505,
+      "end_frame": 601
+    },
+    {
+      "id": "full-07",
+      "before": "The rose rests on a high shelf. The young man holds the closed blue book against his chest.",
+      "action": "The young man puts the book under his left arm and turns toward the doorway.",
+      "after": "The young man has the blue book under his left arm and is turned slightly toward the doorway.",
+      "dialogue": [
+        {
+          "speaker": "The young man",
+          "text": "أرجع أحچيلك شگالت أمي."
+        }
+      ],
+      "completed_before": [
+        "full-01",
+        "full-02",
+        "full-03",
+        "full-04",
+        "full-05",
+        "full-06"
+      ],
+      "start_frame": 601,
+      "end_frame": 697
+    },
+    {
+      "id": "full-08",
+      "before": "The young man has the blue book under his left arm and is turned slightly toward the doorway.",
+      "action": "The bookseller gives one gentle farewell nod while the young man pauses at the doorway.",
+      "after": "The young man pauses at the doorway holding the book; the bookseller nods warmly from the counter.",
+      "dialogue": [],
+      "completed_before": [
+        "full-01",
+        "full-02",
+        "full-03",
+        "full-04",
+        "full-05",
+        "full-06",
+        "full-07"
+      ],
+      "start_frame": 697,
+      "end_frame": 721
+    }
+  ]
+}

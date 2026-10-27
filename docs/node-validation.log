@@ -1,0 +1,47 @@
+
+> iraqi-film-forge@0.1.0 check
+> node tools/check.mjs && tsc --noEmit
+
+
+> iraqi-film-forge@0.1.0 test
+> node --test tests/*.test.mjs
+
+✔ HTTP page cannot transmit admin or Modal credentials at all (3.007ms)
+✔ static Pages without verified backend receives no password or Modal token (1.5305ms)
+✔ backend URLs cannot carry embedded credentials or query-string keys (1.9662ms)
+✔ verified HTTPS API receives credentials once, with redirects forbidden (1.5776ms)
+✔ SDK subprocess never inherits vault key or unrelated provider credentials (1.1855ms)
+(node:23296) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ only two permitted GPUs and pinned native quality (3.0405ms)
+✔ AES-GCM authenticates account identity and never stores plaintext (105.3684ms)
+✔ unconfigured backend refuses all account operations (2.417ms)
+✔ unauthenticated access is denied before contacting Modal (118.5395ms)
+✔ wrong password and HTTP credential intake are rejected (146.3842ms)
+✔ session cookie is Secure HttpOnly and CSRF protected (133.7846ms)
+✔ forged origin and non-admin role are denied (140.5332ms)
+✔ account links are verified, encrypted, deduplicated and redacted (136.1787ms)
+✔ selecting account checks readiness but never creates a GPU job (138.0294ms)
+✔ primary cannot be a transfer destination (143.4188ms)
+✔ prepare plan is read-only and includes missing bytes and unknown costs (169.8019ms)
+✔ paid execution is disabled regardless of browser approval (164.4167ms)
+✔ budget, missing weights and fresh consent are enforced (154.0693ms)
+✔ double click reuses one job; another quote cannot start a second GPU (174.8823ms)
+✔ ambiguous cloud outcomes are never retried automatically (169.1839ms)
+✔ unlink removes ciphertext and never deletes remote resources (125.9963ms)
+✔ restart persists metadata and marks live jobs for manual reconciliation (24.4669ms)
+✔ frontend never persists secrets and exposes only the approved GPU pair (3.1622ms)
+✔ application monthly guard is independent of Modal billing (144.2487ms)
+✔ HF secret is independently encrypted and deletable without export (136.8992ms)
+✔ official-source preparation requires separate HF token and license acknowledgement (154.5602ms)
+✔ reference files persist independently and cannot be silently replaced (142.3956ms)
+✔ completed job metadata remains accessible after account unlink (138.5841ms)
+✔ verified failure can be retried only with a fresh quote and preserves attempt history (219.612ms)
+ℹ tests 29
+ℹ suites 0
+ℹ pass 29
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3184.9075

@@ -1,0 +1,40 @@
+{
+  "name": "short",
+  "duration_seconds": 9,
+  "frames": 217,
+  "scene": "One continuous cinematic camera take in a Baghdad bookshop on Al-Mutanabbi Street at golden hour. A young Iraqi man in a blue linen shirt stands with a kind elderly Iraqi bookseller with a grey moustache and beige shirt. Both remain in view, with a slow smooth camera move, warm consistent light, wooden shelves and plain book covers. Natural synchronized speech and quiet street ambience, realistic faces and hands.",
+  "events": [
+    {
+      "id": "short-01",
+      "before": "The blue book lies closed on the counter. Both men stand calmly with empty hands.",
+      "action": "The young man points once at the blue book and asks for a gift for his mother.",
+      "after": "The young man points towards the blue book; it is still closed on the counter.",
+      "dialogue": [
+        {
+          "speaker": "The young man",
+          "text": "عمو، أريد هدية لأمي."
+        }
+      ],
+      "completed_before": [],
+      "start_frame": 0,
+      "end_frame": 121
+    },
+    {
+      "id": "short-02",
+      "before": "The young man points towards the blue book; it is still closed on the counter.",
+      "action": "The bookseller lifts that blue book and hands it to the young man once. The young man accepts it and smiles warmly.",
+      "after": "The young man holds the closed blue book against his chest. The bookseller has empty hands.",
+      "dialogue": [
+        {
+          "speaker": "The elderly bookseller",
+          "text": "خذ هذا، راح يعجبها."
+        }
+      ],
+      "completed_before": [
+        "short-01"
+      ],
+      "start_frame": 121,
+      "end_frame": 217
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+
+> iraqi-film-forge@0.1.0 build
+> node tools/build.mjs
+
+Static site built in dist/. Engine APIs require the separate trusted HTTPS backend.
+Unauthenticated director POST: 401

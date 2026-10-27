@@ -1,0 +1,17 @@
+test_derived_frame_failure_does_not_discard_mp4 (test_engine_runtime.RuntimeTests.test_derived_frame_failure_does_not_discard_mp4) ... ok
+test_modal_class_graph_is_valid_without_build_or_remote_call (test_engine_runtime.RuntimeTests.test_modal_class_graph_is_valid_without_build_or_remote_call) ... ok
+test_model_plan_constructs_without_torch_or_network (test_engine_runtime.RuntimeTests.test_model_plan_constructs_without_torch_or_network) ... ok
+test_native_image_conditioning_is_wired_and_original_audio_preserved (test_engine_runtime.RuntimeTests.test_native_image_conditioning_is_wired_and_original_audio_preserved) ... ok
+test_no_implicit_cloud_approval (test_engine_runtime.RuntimeTests.test_no_implicit_cloud_approval) ... ok
+test_official_preflight_is_metadata_only (test_engine_runtime.RuntimeTests.test_official_preflight_is_metadata_only) ... ok
+test_stop_checks_ownership_even_when_app_is_not_in_list (test_engine_runtime.RuntimeTests.test_stop_checks_ownership_even_when_app_is_not_in_list) ... ok
+test_transfer_never_writes_primary_or_runs_without_approval (test_engine_runtime.RuntimeTests.test_transfer_never_writes_primary_or_runs_without_approval) ... {"type": "event", "data": {"kind": "phase_start", "phase": "connection"}}
+ok
+test_transfer_repairs_same_size_corruption_and_skips_valid_files (test_engine_runtime.RuntimeTests.test_transfer_repairs_same_size_corruption_and_skips_valid_files) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.916s
+
+OK
+Storyboard: 3 scenes, 45 seconds, estimated cost $0.45
+DRY RUN: no money spent. To generate use --confirm-paid --max-budget-usd N

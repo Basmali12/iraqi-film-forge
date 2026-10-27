@@ -12,8 +12,6 @@ if not (VENDOR/"forge"/"scheduler"/"scheduler.py").exists():
 sys.path.insert(0,str(VENDOR))
 sys.path.insert(0,str(ROOT))
 from forge.compiler.schema import Scene,ProductionPlan
-from forge.scheduler.scheduler import ForgeScheduler
-from forge_bridge.openrouter_heygen import OpenRouterHeyGenPipeline
 
 def load_storyboard(file):
  data=json.loads(file.read_text(encoding="utf8"))
@@ -40,6 +38,10 @@ async def run(args):
   print("DRY RUN: no money spent. To generate use --confirm-paid --max-budget-usd N")
   return
  if args.max_budget_usd is None or estimate>args.max_budget_usd:raise ValueError("Explicit budget approval required")
+ # Load production dependencies only AFTER the paid gate. A dry storyboard
+ # must not initialize a renderer or require OpenCV/Torch/production services.
+ from forge.scheduler.scheduler import ForgeScheduler
+ from forge_bridge.openrouter_heygen import OpenRouterHeyGenPipeline
  pipeline=OpenRouterHeyGenPipeline(duration=duration,resolution=args.resolution,aspect_ratio=args.aspect_ratio)
  async def generate(scene,assets,prev_frame=None):return await pipeline.generate(scene,assets,str(args.output),prev_frame)
  scheduler=ForgeScheduler(plan,generate,num_workers=1,max_retries=0)

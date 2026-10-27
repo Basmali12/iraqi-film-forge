@@ -29,6 +29,7 @@ function render(){
  for(const m of p.messages){const b=document.createElement("div");b.className="chat-bubble "+m.role;b.textContent=m.content;$("messages").append(b)}
  $("messages").scrollTop=$("messages").scrollHeight;
  $("randomImages").checked=!!p.random;
+ $("videoEngine").value=p.videoProvider||"heygen";
  $("phaseLabel").textContent=p.approved?"إنتاج معتمد":p.plan?"التقرير جاهز":"نقاش";
  $("reportSection").hidden=!p.plan;
  $("production").hidden=!p.approved;
@@ -58,7 +59,7 @@ async function renderAssets(){
   card.append(img,label,del);$("assets").append(card);
  }
 }
-function invalidate(p){p.plan=null;p.approved=false;p.jobs=null}
+function invalidate(p){if(p.plan?.videoProvider==="modal"&&p.plan.slots.some(s=>s.jobId))return;p.plan=null;p.approved=false;p.jobs=null}
 $("newStory").onclick=newStory;
 $("assetFiles").onchange=async()=>{
  const p=selected();if(!p||working)return;
@@ -81,6 +82,7 @@ $("applySettings").onclick=()=>{
  settings.router=$("routerKey").value.trim();settings.openai=$("openaiKey").value.trim();
  settings.backend=$("backendUrl").value.trim().replace(/\/$/,"");
  settings.provider=$("provider").value;
+ if($("modalBackendUrl").value.trim()){try{window.EngineAPI.setBase($("modalBackendUrl").value.trim());window.EngineAPI.session().then(()=>{const link=document.querySelector("[data-engine-admin]");if(link)link.hidden=false;}).catch(()=>{});}catch(e){return state("settingsStatus",err(e));}}
  if(settings.backend&&!/^https:\/\//.test(settings.backend))return state("settingsStatus","عنوان السيرفر لازم HTTPS");
  state("settingsStatus",settings.provider==="openai"?"تم حفظ إعدادات OpenAI بالذاكرة مؤقتاً. تشغيله يحتاج خادم وسيط خاص بالمشروع.":"تم حفظ مفتاح OpenRouter بالذاكرة فقط");
  $("routerKey").value="";$("openaiKey").value="";$("settingsPanel").hidden=true;
@@ -128,12 +130,13 @@ async function strictJson(system,messages,validator,tokens){
  throw Error("المخرج ما جهّز تقريراً زمنياً سليماً؛ ما راح نصرف على توليد خاطئ. "+last);
 }
 function prepareBeats(p){
- const sys="Act as a strict screenwriter. Return JSON object {title, duration_seconds, style, synopsis, beats:[{id,story_event,description,characters}]}. Build one MASTER chronological beat sheet from conversation. Required duration: 30 to 600 seconds, multiple of 15, respecting user's maximum duration. Provide between 3 and 16 beats, covering distinct beginning/middle/end exactly once with no repeat or restart. If history, respect the requested dates without inventing missing verified facts. Style includes anime vs realistic. Character descriptions must respect references; do not claim model will resemble real person solely from name. The last beat MUST be the actual story ending; no generic recap. Images are references and are not generated here.";
+ const unit=p.videoProvider==="modal"?10:15;
+ const sys="Act as a strict screenwriter. Return JSON object {title, duration_seconds, style, synopsis, beats:[{id,story_event,description,characters}]}. Build one MASTER chronological beat sheet from conversation. Required duration: 30 to 600 seconds, multiple of "+unit+", respecting user's maximum duration. Provide between 3 and 16 beats, covering distinct beginning/middle/end exactly once with no repeat or restart. If history, respect the requested dates without inventing missing verified facts. Style includes anime vs realistic. Character descriptions must respect references; do not claim model will resemble real person solely from name. The last beat MUST be the actual story ending; no generic recap. Images are references and are not generated here.";
  const messages=[{role:"user",content:"Create one full story plan from this conversation:\n"+p.messages.map(m=>(m.role==="user"?"USER: ":"DIRECTOR: ")+m.content).join("\n").slice(-24000)+"\nUser has "+p.assets.length+" uploaded visual reference(s), images random setting: "+p.random+". Images are NOT automatically generated. Return JSON only."}];
- return strictJson(sys,messages,j=>Number.isInteger(j.duration_seconds)&&j.duration_seconds>=30&&j.duration_seconds<=600&&j.duration_seconds%15===0&&Array.isArray(j.beats)&&j.beats.length>=3&&j.beats.length<=16&&j.beats.every(b=>typeof b.description==="string"&&b.description.length>20),3400);
+ return strictJson(sys,messages,j=>Number.isInteger(j.duration_seconds)&&j.duration_seconds>=30&&j.duration_seconds<=600&&j.duration_seconds%unit===0&&Array.isArray(j.beats)&&j.beats.length>=3&&j.beats.length<=16&&j.beats.every(b=>typeof b.description==="string"&&b.description.length>20),3400);
 }
-function slotPlan(beats,duration){
- const slots=[],n=duration/15;
+function slotPlan(beats,duration,unit=15){
+ const slots=[],n=duration/unit;
  const sizes=beats.map(()=>1);
  // Allocate each beat a contiguous share of the film. Never reshuffle beats in batches.
  if(beats.length>n)throw Error("الأحداث أكثر من عدد مقاطع الفيلم. تحتاج مدة أطول");
@@ -142,10 +145,10 @@ function slotPlan(beats,duration){
  for(let k=0;k<beats.length;k++){
   const b=beats[k];
   for(let i=0;i<sizes[k];i++){
-   slots.push({index:slots.length+1,beat_index:k,beat_id:String(b.id||"B"+(k+1)),start:time,end:time+15,
+   slots.push({index:slots.length+1,beat_index:k,beat_id:String(b.id||"B"+(k+1)),start:time,end:time+unit,
      focus:i===0?"ابدأ حدثاً جديداً":"أكمل نفس الحدث بحركة جديدة دون إعادة المقدمة أو الكلام السابق",
      prompt:"",status:"pending",jobId:null,cost:null});
-   time+=15;
+   time+=unit;
   }
  }
  if(time!==duration||slots.length!==n)throw Error("فشل تثبيت توقيت الفيلم");
@@ -155,7 +158,7 @@ async function detailSlots(p,beats,slots,style){
  for(let i=0;i<slots.length;i+=6){
   const batch=slots.slice(i,i+6);
   state("chatStatus","صياغة المقاطع "+(i+1)+"–"+Math.min(i+6,slots.length)+" حسب ترتيب الأحداث…");
-  const sys="Output JSON {scenes:[{index,beat_id,prompt}]}, EXACTLY "+batch.length+" entries. Every index and beat_id MUST match corresponding slot. The given beat is a LOCKED episode; do NOT recap or repeat previous episodes, do NOT jump backwards in time, do not restart story at each batch. English technical direction, natural original Arabic dialogue, one meaningful action and consequence per 15 sec shot, visual style: "+style+". Character consistency and voice notes remain fixed. Avoid robotic voice promises. Generate only the specified slots.";
+  const sys="Output JSON {scenes:[{index,beat_id,prompt}]}, EXACTLY "+batch.length+" entries. Every index and beat_id MUST match corresponding slot. The given beat is a LOCKED episode; do NOT recap or repeat previous episodes, do NOT jump backwards in time, do not restart story at each batch. English technical direction, natural original Arabic dialogue, one meaningful action and consequence per "+(p.videoProvider==="modal"?10:15)+" sec shot, visual style: "+style+". Character consistency and voice notes remain fixed. Avoid robotic voice promises. Generate only the specified slots.";
   const user=batch.map(x=>({index:x.index,beat_id:x.beat_id,focus:x.focus,beat:beats[x.beat_index].description,actors:beats[x.beat_index].characters})); 
   const j=await strictJson(sys,[{role:"user",content:JSON.stringify({assigned_only:user,completed_prior:slots.slice(0,i).map(s=>({index:s.index,beat_id:s.beat_id,prompt:s.prompt.slice(0,100)}))})}],
    o=>Array.isArray(o.scenes)&&o.scenes.length===batch.length&&o.scenes.every((sc,k)=>sc.index===batch[k].index&&String(sc.beat_id)===String(batch[k].beat_id)&&typeof sc.prompt==="string"&&sc.prompt.length>40),3500);
@@ -165,16 +168,18 @@ async function detailSlots(p,beats,slots,style){
 }
 $("draftReport").onclick=async()=>{
  if(working)return;const p=selected();
+ if(p.plan?.videoProvider==="modal"&&p.plan.slots.some(s=>s.jobId))return state("chatStatus","لهذه الخطة مهام محفوظة. أنشئ قصة جديدة لتغييرها دون المساس بالمشاهد السابقة.");
  if(p.messages.filter(m=>m.role==="user").length<1)return state("chatStatus","احچي مع المخرج عن القصة أولاً");
  if(!confirm("تحضير التقرير يستخدم API النصي برسوم بسيطة محتملة، لكن ما يولّد فيديو. موافق؟"))return;
  working=true;$("draftReport").disabled=true;
  try{
   state("chatStatus","قراءة المحادثة كاملة وبناء خط زمني واحد…");
-  const a=await prepareBeats(p),slots=slotPlan(a.beats,a.duration_seconds);
+  const a=await prepareBeats(p),slots=slotPlan(a.beats,a.duration_seconds,p.videoProvider==="modal"?10:15);
   await detailSlots(p,a.beats,slots,a.style||"cinematic");
   p.plan={title:String(a.title||p.name),synopsis:String(a.synopsis||""),style:String(a.style||"cinematic"),
    beats:a.beats,slots,seconds:a.duration_seconds,estimate:a.duration_seconds*.01,quality:"480p",ratio:"9:16",
-   preparedAt:Date.now(),frozenConversationSize:p.messages.length,verified:true};
+   videoProvider:p.videoProvider||"heygen",preparedAt:Date.now(),frozenConversationSize:p.messages.length,verified:true};
+  if(p.videoProvider==="modal"){p.plan.estimate=0;p.plan.quality="576x1024";p.plan.costPending=true;}
   p.approved=false;p.jobs=null;persist();render();
   state("chatStatus","✓ جاهز التقرير؛ شيك التسلسل والكلفة قبل موافقتك");
   $("reportSection").scrollIntoView({behavior:"smooth"});
@@ -186,7 +191,7 @@ function renderPlan(){
  $("planSummary").textContent=plan.title+" — "+plan.synopsis+" | "+plan.style;
  $("sumDuration").textContent=toClock(plan.seconds);
  $("sumClips").textContent=plan.slots.length;
- $("sumPrice").textContent="$"+plan.estimate.toFixed(2)+" تقريباً";
+ $("sumPrice").textContent=plan.costPending?"تسعير Modal لكل مشهد قبل التنفيذ":"$"+plan.estimate.toFixed(2)+" تقريباً";
  $("sumBeats").textContent=plan.beats.length;
  $("beatList").replaceChildren();
  plan.beats.forEach((b,i)=>{const div=document.createElement("div");div.className="beat";div.textContent=(i+1)+". "+String(b.story_event||b.id||"")+" — "+b.description;$("beatList").append(div)});
@@ -199,11 +204,14 @@ $("approvePlan").onclick=async()=>{
  const p=selected();if(!p?.plan||p.approved)return;
  if(p.plan.frozenConversationSize!==p.messages.length)return state("planStatus","القصة تغيرت بعد التقرير؛ أعد تجهيز التقرير");
  const m=p.plan;
- if(!m.verified||m.slots.length!==m.seconds/15||m.slots.some((s,i)=>s.index!==i+1||!s.prompt))
+ if(!m.verified||m.slots.length!==m.seconds/(m.videoProvider==="modal"?10:15)||m.slots.some((s,i)=>s.index!==i+1||!s.prompt))
   return state("planStatus","التقرير غير مكتمل زمنياً؛ ما يصير نبدأ التوليد");
  const hasHistorical=/صدام|saddam|historical|تاريخي|أحمد حسن|al.bakr/i.test(p.messages.filter(x=>x.role==="user").map(x=>x.content).join(" "));
  if(hasHistorical&&!p.assets.length&&!p.random)
   return state("planStatus","لتجنب شخصية تاريخية عشوائية: ارفع صورة مرجعية أولاً، أو ناقش المرجع مع المخرج. هذا منع للخصم الخطأ.");
+ if(m.videoProvider==="modal"){
+  p.approved=true;persist();render();await runProduction(true);return;
+ }
  if(!settings.router)return state("planStatus","أضف مفتاح OpenRouter للفيديو من ⚙️ إعدادات المفاتيح");
  if(!confirm("موافقة على إنتاج "+m.slots.length+" مقطعاً، مجموع "+m.seconds+" ثانية. السعر المرجعي يبدأ من $"+m.estimate.toFixed(2)+" عند 480p، ولا يشمل التغيّر بالأسعار أو تكرار الطلب. كل مشهد قد يخصم من OpenRouter. هل توافق؟"))return;
  p.approved=true;persist();render();state("chatStatus","✓ تمت الموافقة. يبدأ الآن توليد المشاهد بالترتيب تلقائياً.");
@@ -238,6 +246,13 @@ async function lastImage(blob){
 }
 const sleep=t=>new Promise(ok=>setTimeout(ok,t));
 async function runProduction(alreadyConfirmed=false){
+ const modalProject=selected();
+ if(modalProject?.plan?.videoProvider==="modal"){
+  if(working||!modalProject.approved)return;working=true;stopping=false;renderProgress();
+  try{await window.ModalDirector.run(modalProject,{stopping:()=>stopping,asset:getData,clip:putData,save:()=>{persist();renderProgress();},log:message=>{state("progressText",message);},merge:mergeClips});}
+  catch(e){pushLog(err(e));state("chatStatus",err(e));}finally{working=false;renderProgress();}
+  return;
+ }
  const p=selected();if(!p?.approved||working)return;
  if(!settings.router)return state("chatStatus","مفتاح الفيديو OpenRouter غير موجود");
  if(!alreadyConfirmed&&!confirm("هل تريد بدء أو استئناف مهام HeyGen المدفوعة؟ ماكو إعادة تلقائية لمهمة فاشلة أو مجهولة."))return;
@@ -314,3 +329,6 @@ $("mergeProduction").onclick=mergeClips;
 window.addEventListener("pagehide",()=>{stopping=true});
 try{const saved=JSON.parse(localStorage.getItem(STORAGE)||"null");if(saved&&Array.isArray(saved.projects)){projects=saved.projects;active=saved.active}}catch{}
 if(!selected())newStory();else render();
+
+$("videoEngine").onchange=()=>{const p=selected();if(!p||working)return;if(p.plan?.slots.some(s=>s.status!=="pending")){ $("videoEngine").value=p.videoProvider||"heygen";return state("chatStatus","المشروع يحتوي مهام سابقة. أنشئ قصة مستقلة للمحرك الآخر حتى تبقى النتائج محفوظة."); }p.videoProvider=$("videoEngine").value;invalidate(p);persist();render();};
+$("restoreModal").onclick=async()=>{if(working)return;try{await window.EngineAPI.session();const stored=await window.EngineAPI.request("projects"),remote=await window.EngineAPI.request("state");for(const r of stored){if(projects.some(p=>p.id===r.id))continue;const p={...r.snapshot,assets:[],messages:[{role:"assistant",content:"خطة LTX مستعادة من الخادم؛ المراجع الأصلية على جهازها، ونتائج المشاهد تبقى بالخادم."}],videoProvider:"modal",approved:true};const refs=await window.EngineAPI.request("projects/"+p.id+"/references");for(const ref of refs){const response=await fetch(window.EngineAPI.base+"/api/engine/projects/"+p.id+"/references/"+ref.id,{credentials:"include",redirect:"error"});if(!response.ok)throw Error("تعذر استرجاع مرجع محفوظ");const blob=await response.blob(),data=await new Promise((ok,no)=>{const reader=new FileReader();reader.onload=()=>ok(reader.result);reader.onerror=no;reader.readAsDataURL(blob);});await putData(ref.assetId,data);p.assets.push({id:ref.assetId,name:ref.name});}const scenes=await window.EngineAPI.request("projects/"+p.id+"/scenes");for(const slot of p.plan.slots){const saved=scenes.find(s=>s.sceneId==="scene-"+slot.index);const job=saved?{id:saved.jobId}:remote.jobs.find(j=>j.projectId===p.id&&j.sceneId==="scene-"+slot.index);if(job){slot.jobId=job.id;slot.status="submitted";}}projects.push(p);}persist();render();state("chatStatus","تم استرجاع الخطط دون حذف أو استبدال أي مشروع موجود. استئناف المشهد المكتمل ينزّل نتيجته ولا يعيد توليده.");}catch(e){state("chatStatus",err(e));}};

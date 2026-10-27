@@ -1,0 +1,2 @@
+# Source build backend pinned independently of runtime/model quality dependencies.
+uv_build==0.9.8

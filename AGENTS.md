@@ -3,7 +3,7 @@
 This repository is an **independent project**. NEVER edit or connect to `mashhad-ad-studio` or any other existing repo.
 
 ## Immutable product requirements
-- Only video model: `heygen/heygen-video-1` through OpenRouter.
+- Legacy default video model: `heygen/heygen-video-1` through OpenRouter. Explicit user authorization on 2026-10-27 adds the optional administrator-only LTX-2.5 Distilled / Modal route. Preserve both routes and existing successful projects.
 - Chat model is a separate language model; never describe HeyGen as a conversational LLM.
 - User-supplied `OPENROUTER_API_KEY` must never be committed, logged, placed in query params, or exposed to other users.
 - Show current real pricing before generation and require an explicit user click to incur charges.
@@ -32,6 +32,7 @@ This repository is an **independent project**. NEVER edit or connect to `mashhad
 - Run a dry storyboard test.
 - Verify GitHub Pages public URL actually resolves rather than guessing.
 - Never run any video generation request unless the user authorizes its cost.
+- Modal management: keep ENGINE_ALLOW_PAID_ACTIONS disabled by default. A deployment, Volume creation, transfer, image build, GPU allocation or generation is not authorized by a local implementation/test request. Tests use isolated fixtures, never real cloud mutations.
 
 ## Film continuation and no-loss merging (added 2026-10-26)
 - The browser must maintain an ordered `filmClips` array of *original generated video blobs*, and the latest **raw** clip is the source for the next last-frame seed.

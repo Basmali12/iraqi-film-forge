@@ -1,0 +1,54 @@
+{
+  "checkedAt": "2026-10-27T07:47:43.515Z",
+  "workspace": "basm1998ali",
+  "environment": "main",
+  "ready": true,
+  "files": [
+    {
+      "name": "diffusion_models/ltx-2.5-22b-distilled-transformer-bf16.safetensors",
+      "size": 42018190584,
+      "manifestMatch": true,
+      "expectedSHA256": "31eb3cad89b9e54e99dd3baf286f70825ac4f6c660a70d9184d895be76d7bff4",
+      "hashVerifiedNow": false
+    },
+    {
+      "name": "text_encoders/gemma4-12b-with-proj-ltx-2.5-bf16.safetensors",
+      "size": 26263858182,
+      "manifestMatch": true,
+      "expectedSHA256": "ef7243612fdae7a75cb4d5cee9433e81380675fb6c213bd98ae74a9cd16561d1",
+      "hashVerifiedNow": false
+    },
+    {
+      "name": "vae/ltx-2.5-video-vae-conv-bf16.safetensors",
+      "size": 1452269922,
+      "manifestMatch": true,
+      "expectedSHA256": "685b06ee3d9b2039647698fc4ea33175112462fc374e2777312c907897dfce8d",
+      "hashVerifiedNow": false
+    },
+    {
+      "name": "vae/ltx-2.5-audio-vae-bf16.safetensors",
+      "size": 364866540,
+      "manifestMatch": true,
+      "expectedSHA256": "c52733d37f6a7fb7949c3dc0fb468c6cb2169e4d836983a73babb9f0d54837a5",
+      "hashVerifiedNow": false
+    },
+    {
+      "name": "latent_upscale_models/ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors",
+      "size": 995778752,
+      "manifestMatch": true,
+      "expectedSHA256": "eb5a71fe4068ee87ccdb1c3aa635e547ca76bd2d30ae20ae889f2c325c0677e8",
+      "hashVerifiedNow": false
+    }
+  ],
+  "bytes": 71094963980,
+  "runningTasks": 0,
+  "apps": [],
+  "configurationSource": "pinned locally verified benchmark; remote dependency image not introspected",
+  "readyMarker": {
+    "revision": "49b093a39c19169a8a81721dcc541e07e945232f",
+    "present": true
+  },
+  "gpuStarted": false,
+  "weightsDownloaded": false,
+  "remoteResourcesCreated": false
+}

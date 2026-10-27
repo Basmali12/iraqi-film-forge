@@ -1,7 +1,10 @@
 import http from "node:http";
+import https from "node:https";
 import fs from "node:fs/promises";
 import path from "node:path";
 import {fileURLToPath} from "node:url";
+import {createEngineAPI} from './engine/api.mjs';
+import {masterKey} from './engine/keyring.mjs';
 
 const SITE=path.join(path.dirname(fileURLToPath(import.meta.url)),"site");
 const HOST=process.env.HOST||"127.0.0.1";
@@ -19,7 +22,9 @@ async function readBody(req){
  for await(const chunk of req){length+=chunk.length;if(length>2500000)throw Error("Request too large");chunks.push(chunk)}
  return Buffer.concat(chunks);
 }
-const server=http.createServer(async(req,res)=>{
+const engineAPI=createEngineAPI({key:masterKey(process.env.ENGINE_DATA_DIR||'.engine-data')});
+const requestHandler=async(req,res)=>{
+ if(await engineAPI.handler(req,res))return;
  const url=new URL(req.url,"http://localhost");
  // A minimal BYO-key OpenAI proxy. Deploy behind HTTPS with origin allowlisting.
  if(url.pathname==="/api/director/chat"){
@@ -51,8 +56,12 @@ const server=http.createServer(async(req,res)=>{
   return;
  }
  if(!url.pathname.startsWith("/api/v1/")){
-  const filename={"/":"index.html","/index.html":"index.html","/styles.css":"styles.css","/app.js":"app.js","/film.html":"film.html","/film.js":"film.js","/film.css":"film.css","/director.html":"director.html","/director.js":"director.js","/director.css":"director.css","/stitcher.js":"stitcher.js"}[url.pathname];
+  const filename={"/":"index.html","/index.html":"index.html","/styles.css":"styles.css","/app.js":"app.js","/film.html":"film.html","/film.js":"film.js","/film.css":"film.css","/director.html":"director.html","/director.js":"director.js","/director.css":"director.css","/stitcher.js":"stitcher.js","/engines.html":"engines.html","/engines.js":"engines.js","/engines.css":"engines.css","/engine-client.js":"engine-client.js","/engine-endpoint.js":"engine-endpoint.js","/modal-director.js":"modal-director.js"}[url.pathname];
   if(!filename){reply(res,404,'{"error":"Not found"}');return}
+  if(filename==='engines.html'){
+   res.setHeader('X-Frame-Options','DENY');res.setHeader('Referrer-Policy','no-referrer');
+   res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' https:; img-src 'self' data: blob:; media-src 'self' https: blob:; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
+  }
   try{let bytes=await fs.readFile(path.join(SITE,filename));reply(res,200,bytes,mime[path.extname(filename)])}
   catch(e){reply(res,500,'{"error":"Missing site file"}')}
   return;
@@ -81,5 +90,8 @@ const server=http.createServer(async(req,res)=>{
   const output=Buffer.from(await upstream.arrayBuffer());
   reply(res,upstream.status,output,upstream.headers.get("content-type")||"application/json");
  }catch(e){reply(res,502,JSON.stringify({error:String(e.message).slice(0,220)}))}
-});
-server.listen(PORT,HOST,()=>console.log("Iraqi Film Forge http://"+HOST+":"+PORT));
+};
+const tls=process.env.ENGINE_TLS_CERT&&process.env.ENGINE_TLS_KEY;
+const server=tls?https.createServer({cert:await fs.readFile(process.env.ENGINE_TLS_CERT),key:await fs.readFile(process.env.ENGINE_TLS_KEY)},requestHandler):http.createServer(requestHandler);
+server.listen(PORT,HOST,()=>console.log("Iraqi Film Forge "+(tls?'https':'http')+"://"+HOST+":"+PORT));
+for(const signal of ['SIGTERM','SIGINT'])process.on(signal,async()=>{server.close();await engineAPI.close();});

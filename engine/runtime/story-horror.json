@@ -1,0 +1,67 @@
+{
+  "name": "horror",
+  "duration_seconds": 10,
+  "frames": 241,
+  "window_seconds": 10,
+  "language": "clear Modern Standard Arabic (Arabic Fusha), quiet natural human speech",
+  "speakers": [
+    "Ali"
+  ],
+  "scene": "Photorealistic cinematic horror, live-action film realism, one uninterrupted vertical medium-wide shot. Ali is a realistic adult Iraqi man, age 32, olive skin, short black hair, a neatly trimmed beard, a worn charcoal cotton shirt and dark trousers. Natural human facial proportions, realistic skin pores, fabric and physically plausible motion. He holds a small electric flashlight in his right hand inside an old dark Baghdadi house, cracked plaster walls, weathered wooden door, dusty tiled floor, faint moonlight. Static camera with a very slow restrained push-in; Ali and the door remain together in frame. The frightening cause must happen visibly BEFORE his startled reaction. At first he is calm, not already screaming. Only one man, no cartoon, no stylized animation, no illustrated appearance, no gore, no captions, no writing. Native synchronized audio: low indoor night ambience, the door banging, debris falling, restrained breathing and one brief spoken line. No music, narrator or singing.",
+  "events": [
+    {
+      "id": "realistic-01",
+      "start_frame": 0,
+      "end_frame": 72,
+      "before": "Ali stands still, relaxed but attentive, flashlight aimed low; the wooden door is fully closed.",
+      "action": "For the first three seconds Ali listens quietly. The wooden door stays shut. He does not react with fear yet.",
+      "after": "Ali remains attentive and has not yet flinched; the door stays closed.",
+      "dialogue": [],
+      "completed_before": []
+    },
+    {
+      "id": "realistic-02",
+      "start_frame": 72,
+      "end_frame": 120,
+      "before": "Ali remains attentive and has not yet flinched; the door stays closed.",
+      "action": "At three seconds the closed door abruptly swings inward by itself and strikes the wall with one loud wooden bang. Dust drops from the lintel. Show this cause clearly before any reaction.",
+      "after": "The door has burst inward and struck the wall, dust falls; Ali has just heard and seen the impact.",
+      "dialogue": [],
+      "completed_before": [
+        "realistic-01"
+      ]
+    },
+    {
+      "id": "realistic-03",
+      "start_frame": 120,
+      "end_frame": 192,
+      "before": "The door has burst inward and struck the wall, dust falls; Ali has just heard and seen the impact.",
+      "action": "Only AFTER the door has struck the wall, Ali visibly flinches, takes one short step backward and raises his flashlight toward the doorway. With restrained fear he whispers the single line.",
+      "after": "Ali has recoiled one step after the impact; he holds the flashlight steady toward the open doorway.",
+      "dialogue": [
+        {
+          "speaker": "Ali",
+          "text": "مَن هناك؟"
+        }
+      ],
+      "completed_before": [
+        "realistic-01",
+        "realistic-02"
+      ]
+    },
+    {
+      "id": "realistic-04",
+      "start_frame": 192,
+      "end_frame": 241,
+      "before": "Ali has recoiled one step after the impact; he holds the flashlight steady toward the open doorway.",
+      "action": "Ali freezes in his new position, staring at the open dark doorway, with a small tremor of the flashlight and audible breathing. Do not repeat the door slam or the spoken line.",
+      "after": "Ali remains one step back, breathing with fear, watching the empty dark doorway.",
+      "dialogue": [],
+      "completed_before": [
+        "realistic-01",
+        "realistic-02",
+        "realistic-03"
+      ]
+    }
+  ]
+}

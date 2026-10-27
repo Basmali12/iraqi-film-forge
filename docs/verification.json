@@ -1,0 +1,32 @@
+{
+  "checkedAt": "2026-10-27T08:18:59.542Z",
+  "localOnly": true,
+  "nodeTestsPassed": 29,
+  "pythonTestsPassed": 9,
+  "syntaxAndTypeScript": "pass",
+  "staticBuild": "pass",
+  "dryStoryboard": "3 scenes; no paid invocation",
+  "pythonCompile": "pass",
+  "dpapiRoundTrip": "pass, key not printed",
+  "ui": {
+    "desktop": {
+      "width": 1366,
+      "contentWidth": 1351,
+      "columns": 2
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "contentWidth": 375,
+      "rtl": true
+    },
+    "fixturesExplicitlyLabelled": true,
+    "paidConfirmationDisabled": true,
+    "consoleErrors": 0
+  },
+  "realSDKInspection": "read-only-inspection.json",
+  "gpuStarted": false,
+  "modelDownloaded": false,
+  "volumeCreated": false,
+  "published": false
+}

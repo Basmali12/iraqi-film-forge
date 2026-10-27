@@ -10,3 +10,13 @@ clips/
 *.wav
 *.secret
 .DS_Store
+.engine-data/
+*.sqlite*
+*.pem
+*.key
+*.crt
+coverage/
+dist/
+.venv-engine/
+*.dpapi
+.engine-preview/
