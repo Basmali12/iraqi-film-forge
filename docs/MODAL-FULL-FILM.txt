@@ -1,0 +1,81 @@
+Modal full-film integration — local implementation and verification, 2026-10-27
+
+Status: implemented locally; NOT deployed to HostHatch or GitHub Pages.
+No Modal jobs, image builds, model downloads, transfers or GPU allocation were executed.
+The current live website does not contain these changes yet.
+
+Repositories and dependencies inspected
+- Actual inference: https://github.com/Lightricks/LTX-2
+  Source commit e98f6d927d83c92ef2be6aec76c8440b19306e39.
+  Model revision 49b093a39c19169a8a81721dcc541e07e945232f.
+  Existing Conv VAE, native video/audio, FP8 cast, CPU offload, Torch 2.9.1+cu128.
+- Browser assembly: https://github.com/ffmpegwasm/ffmpeg.wasm
+  Existing @ffmpeg/ffmpeg 0.12.6, @ffmpeg/core 0.12.3.
+  Preserve recursive batches of six; limits of 12 clips/140 MB apply per invocation.
+  Large final batches or mobile memory/CDN failures remain possible; original clips survive.
+- Optional CLI orchestration: https://github.com/F-R-L/forge-film
+  scripts/vendor_forge.sh pins f67f0a003; tools/forge_run.py uses its scheduler.
+  This is NOT the browser Modal execution engine; no upstream clone was run here.
+- UI: existing vanilla JavaScript, Arabic RTL, IndexedDB clips and plans.
+- Backend: existing Node HTTP server, authenticated admin API, PostgreSQL via pg 8.16.3.
+  No new subscription, text API key, voice engine or model is required by the new local planner.
+
+Implemented
+1. film.html keeps the legacy HeyGen default and adds an explicit Modal/LTX provider.
+2. Free rules-based chronological splitting of the complete user-written story.
+   30–600 seconds, multiples of 10: 180s = 18 scenes; 300s = 30 scenes.
+   A scene gets its own events/dialogue. Missing story detail causes a clear refusal,
+   not repeated events or invented dialogue. This is not a semantic LLM screenwriter.
+3. Optional stable cast/voice instructions; no claim of verified face/voice locking.
+4. Uses only an explicitly prepared engine of the selected account/GPU.
+   No implicit new GPU allocation, GPU fallback or automatic paid retry.
+5. Each new scene needs a real server quote and explicit individual cost consent.
+   Film-plan approval alone never dispatches a paid scene.
+6. First three scenes require human quality review before proceeding to later scenes.
+7. Durable ambiguous status precedes submit; job IDs persist immediately after acknowledgement.
+   Completed clips are not regenerated when resuming. Lost acknowledgements stop the flow.
+8. Backend resolves previousSceneId to a completed scene in the same project and its saved
+   last-frame file; private controller pipe passes this reference to the existing GPU session.
+9. Persistent StoryEngine accepts a fresh unique conditioning image for each request and
+   clears prior conditioning on unconditioned requests. Transformer reuse remains intact.
+10. Native ImageConditioningInput.at(frame=0) is supplied to LTX run preparation and denoising.
+    Audit stores conditioning count and SHA256 of the actual input image; GPU verification pending.
+11. Original clips have project-scoped IndexedDB keys; recursive FFmpeg assembly keeps audio.
+    New Modal plans archive previous project metadata without deleting prior clips.
+
+Important limitations
+- Continuation is last-frame image-conditioned clips followed by assembly, NOT native
+  cross-clip joint video/audio latent continuation. Motion, voice, lips and identities may drift.
+- Browser supervises scene sequencing and merging. Closing the page pauses scheduling;
+  an already dispatched cloud scene may continue. Resume polls the saved job ID.
+- No whole-film fixed cost is asserted. Each scene is quoted before execution; actual costs
+  remain null until supplied by the provider. Paid engine idle time may also be billed.
+- Runtime source changes may require new image layers on a later approved engine start;
+  no image build was performed here. Existing saved model weights remain unchanged.
+- No paid three-scene continuity test, native conditioned GPU inference, long-film merge,
+  live PostgreSQL migration or production deployment was performed in this task.
+
+Free verification
+- JavaScript: 94 tests; 93 passed, 1 real PostgreSQL integration test skipped.
+- Python: 65 tests; 64 passed, 1 Caddy/OpenSSL platform integration test skipped.
+- npm run check and npm run build passed.
+- Offline API/session tests verify same-project previous frame, one prepared session,
+  idempotency, distinct scene prompts, lost acknowledgement handling and three-scene gate.
+- Browser interaction on isolated local backend: real free plan of 18 scenes / 180 seconds;
+  no OpenRouter key entered, no production project changed, no generation button pressed.
+- Local HTTP: health 200; unconfigured admin state 503; both new/shared script routes 200.
+
+Local preview: http://127.0.0.1:59381/film.html
+Choose Modal / LTX-2.5; enter full chronological story; set duration; analyze locally.
+The preview backend has paid actions disabled and no configured admin credentials.
+Paid validation should begin with three approved scenes, review native audio and transition
+frames, then consider 18/30 scenes. Deployment and paid test remain separate steps.
+
+Files changed in this task (the checkout also contains preserved changes from prior tasks):
+engine/api.mjs; engine/session-channel.mjs; engine/gpu_host.py;
+engine/runtime/engine.py; engine/runtime/gpu_service.py; server.mjs;
+site/film.html; site/film.js; site/film-modal-plan.js; site/modal-director.js;
+tests/engine.test.mjs; tests/test_engine_runtime.py; tests/session-channel.test.mjs;
+tests/manual-director.test.mjs; tests/film-modal-plan.test.mjs; tests/modal-film-flow.test.mjs;
+docs/MODAL-FULL-FILM.txt.
+No files deleted; no commit, push, branch merge or production deployment performed.

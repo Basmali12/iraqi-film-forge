@@ -4,6 +4,7 @@ import gc
 import json
 import os
 import time
+from pathlib import Path
 from types import SimpleNamespace
 
 import settings as cfg
@@ -30,7 +31,7 @@ class StoryEngine:
         self.events=telemetry or EventSink()
         self.weight_observer=None
 
-    def prepare(self,load_transformer=True):
+    def prepare(self,load_transformer=True,defer_prompt=False):
         if os.environ.get('LTX25_LAB_PAID_APPROVED')!='YES':
             raise RuntimeError('Cloud/model initialization blocked without explicit approval')
         if self.prepared:raise RuntimeError('Engine already prepared')
@@ -83,7 +84,7 @@ class StoryEngine:
         self.weight_observer.install()
         self.device=torch.device('cuda')
         self.device_info={'name':props.name,'capability':list(capability),'total_vram_bytes':props.total_memory,
-                          'torch':torch.__version__,'cuda':torch.version.cuda,'compiled_arches':arches,
+                          'torch':str(torch.__version__),'cuda':torch.version.cuda,'compiled_arches':arches,
                           'runtime_smoke_passed':True}
         started=time.monotonic()
         paths={flag:f'{cfg.MODEL_DIR}/{name}' for flag,name in zip(
@@ -98,24 +99,8 @@ class StoryEngine:
             if self.pipeline.video_decoder._diffusion_vae:
                 raise RuntimeError('This lab permits the existing Conv VAE only')
             torch.cuda.reset_peak_memory_stats()
-            # Encode distinct events in one Gemma lifetime, then release its weights BEFORE DiT.
-            prompts=[e['prompt'] for e in self.instructions]
             self.contexts=[]
-            prompt_encoder=self.pipeline.prompt_encoder
-            # Prompt batch=1: keep Gemma/connector for this phase only. Never retain all
-            # raw hidden states, or load the DiT while Gemma weights remain resident.
-            with self.events.span('prompt_prepare'):
-                with self.events.observed_context(prompt_encoder._text_encoder_ctx,'text_encoder_load')() as encoder:
-                    with self.events.observed_context(lambda:gpu_model(prompt_encoder._build_embeddings_processor()),'text_connector_load')() as processor:
-                        self.guard_memory()
-                        for prompt in prompts:
-                            raw=self.events.call(encoder.encode,'text_forward',[prompt])
-                            hidden,mask=raw[0]
-                            encoded=self.events.call(processor.process_hidden_states,'text_connector_forward',hidden,mask)
-                            self.contexts.append(SimpleNamespace(video_encoding=encoded.video_encoding.detach().cpu(),
-                                                                 audio_encoding=encoded.audio_encoding.detach().cpu()))
-                            del encoded,hidden,mask,raw
-                            self.guard_memory()
+            if not defer_prompt:self._encode_prompt_contexts()
             gc.collect(); torch.cuda.empty_cache()
             self.cache=ComponentCache(lambda:torch.cuda.mem_get_info()[0],torch.cuda.memory_allocated,
                                       cfg.AUX_CACHE_LIMIT_BYTES,cfg.MIN_FREE_VRAM_BYTES)
@@ -134,6 +119,48 @@ class StoryEngine:
         self.init_seconds=time.monotonic()-started
         self.prepared=True
 
+    def _encode_prompt_contexts(self):
+        from ltx_pipelines.utils.gpu_model import gpu_model
+        torch=self.torch
+        prompts=[e['prompt'] for e in self.instructions]
+        self.contexts=[]
+        prompt_encoder=self.pipeline.prompt_encoder
+        # Prompt batch=1: keep Gemma/connector for this phase only. Never retain all
+        # raw hidden states; release Gemma before denoising. Memory guards remain active.
+        with self.events.span('prompt_prepare'):
+            with self.events.observed_context(prompt_encoder._text_encoder_ctx,'text_encoder_load')() as encoder:
+                with self.events.observed_context(lambda:gpu_model(prompt_encoder._build_embeddings_processor()),'text_connector_load')() as processor:
+                    self.guard_memory()
+                    for prompt in prompts:
+                        raw=self.events.call(encoder.encode,'text_forward',[prompt])
+                        hidden,mask=raw[0]
+                        encoded=self.events.call(processor.process_hidden_states,'text_connector_forward',hidden,mask)
+                        self.contexts.append(SimpleNamespace(video_encoding=encoded.video_encoding.detach().cpu(),
+                                                             audio_encoding=encoded.audio_encoding.detach().cpu()))
+                        del encoded,hidden,mask,raw
+                        self.guard_memory()
+
+    def set_plan(self,plan):
+        if not self.prepared or self.rendering:
+            raise RuntimeError('Plan may change only between renders on a prepared engine')
+        plan=copy.deepcopy(plan)
+        if plan.get('frames')!=241 or plan.get('window_seconds')!=10:
+            raise RuntimeError('Prepared session quality cannot change')
+        self.plan=plan
+        self.instructions=window_instructions(plan)
+        self.expected_hash=plan_hash(plan)
+        self.contexts=[]
+        if getattr(self,'cache',None):self.cache.evict_idle()
+        gc.collect();self.torch.cuda.empty_cache()
+        with self.torch.inference_mode():self._encode_prompt_contexts()
+        gc.collect();self.torch.cuda.empty_cache();self.guard_memory()
+
+    def set_image(self,path):
+        if not self.prepared or self.rendering:
+            raise RuntimeError('Conditioning may change only between renders')
+        if path and not Path(path).is_file():raise RuntimeError('Conditioning image missing')
+        self.image_path=path
+
     def guard_memory(self):
         if self.torch.cuda.mem_get_info()[0] < cfg.MIN_FREE_VRAM_BYTES:
             if self.cache:self.cache.evict_idle()
@@ -142,7 +169,7 @@ class StoryEngine:
             raise MemoryBudgetExceeded('VRAM headroom below 12GiB; stop without retry or no-offload')
 
     def render(self,raw_path,audit_path):
-        if not self.prepared or self.rendering:raise RuntimeError('Engine not ready or already in use')
+        if not self.prepared or self.rendering or not self.contexts:raise RuntimeError('Engine not ready, prompt missing or already in use')
         if plan_hash(self.plan)!=self.expected_hash:raise RuntimeError('Snapshot/story identity mismatch')
         from ltx_core.types import VideoPixelShape
         from ltx_core.model.video_vae import AUTO_TILING
@@ -156,6 +183,8 @@ class StoryEngine:
         torch=self.torch
         events=[]; calls=[]
         started=time.monotonic()
+        self.denoise_completed=0
+        self.denoise_total=len(self.instructions)*((len(DISTILLED_SIGMAS)-1)+(len(STAGE_2_DISTILLED_SIGMAS)-1))
         self.rendering=True
         status='error'
         try:
@@ -179,6 +208,11 @@ class StoryEngine:
                         vae_dtype=torch.bfloat16,tiling_config=AUTO_TILING,enhance_prompt=False,
                         enhance_static_cache=False,generated_keyframes=0,decode_with_keyframes=False,
                         chunk_config=chunk_config)
+                    if conditioning and not ctx.images:raise RuntimeError('Native image conditioning was not applied')
+                    import hashlib
+                    self.last_conditioning={'mode':'last-frame image-to-video' if conditioning else 'text-to-video',
+                        'image_sha256':hashlib.sha256(Path(self.image_path).read_bytes()).hexdigest() if conditioning else None,
+                        'frame':0 if conditioning else None,'native_conditioning_count':len(ctx.images)}
                 finally:self.pipeline.prompt_encoder=original_encoder
                 chunks=generate_uniform_chunks(
                     target=VideoPixelShape(batch=1,frames=ctx.num_frames,height=ctx.stage_1_height,
@@ -217,6 +251,7 @@ class StoryEngine:
         finally:
             self.rendering=False
             payload={'status':status,'story_hash':self.expected_hash,'events':events,'stage_calls':calls,
+                     'conditioning':getattr(self,'last_conditioning',None),
                      'load_phase_seconds_recorded_at_prepare':self.init_seconds,'render_seconds':time.monotonic()-started,
                      'transformer_build_count':self.shared.build_count,'transformer_build_seconds':self.shared.build_seconds,
                      'transformer_borrow_count':self.shared.borrow_count,'aux_build_counts':self.cache.builds,
@@ -262,8 +297,10 @@ class MeasuredStage:
             result=original_denoiser(*a,**k)
             self.engine.torch.cuda.synchronize()
             completed+=1
+            self.engine.denoise_completed+=1
             self.engine.events.emit('progress',phase='denoise_'+self.phase,window=self.index,
-                                    completed=completed,total=total,unit='denoiser_evaluations')
+                                    completed=completed,total=total,unit='denoiser_evaluations',
+                                    global_completed=self.engine.denoise_completed,global_total=self.engine.denoise_total)
             return result
         kwargs['denoiser']=observed_denoiser
         with self.engine.events.span('denoise_'+self.phase,window=self.index):

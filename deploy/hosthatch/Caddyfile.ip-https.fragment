@@ -1,0 +1,31 @@
+# Approval required. Trusted certificate must exist BEFORE activation.
+http://167.104.162.4 {
+    handle /.well-known/acme-challenge/* {
+        root * /var/lib/iraqi-film-forge-acme-webroot
+        file_server
+    }
+    handle {
+        redir https://167.104.162.4{uri} 308
+    }
+}
+
+https://167.104.162.4 {
+    tls /var/lib/caddy/iff-ip-tls/current/fullchain.pem /var/lib/caddy/iff-ip-tls/current/privkey.pem
+    encode zstd gzip
+    header {
+        X-Content-Type-Options nosniff
+        Referrer-Policy same-origin
+        X-Frame-Options DENY
+    }
+    # The existing BYO-key proxies are NOT approved for internet publication.
+    # They remain available in the original site; this new preview exposes Modal only.
+    @legacy path /api/v1/* /api/director/*
+    handle @legacy {
+        respond "Legacy proxy is not published on this preview" 403
+    }
+    handle {
+        reverse_proxy 127.0.0.1:3107 {
+            header_up X-Forwarded-Proto https
+        }
+    }
+}

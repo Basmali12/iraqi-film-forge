@@ -122,8 +122,8 @@ def window_instructions(plan):
             words=' '.join(f'{line["speaker"]} says aloud in {language}: "{line["text"]}".' for line in speech)
             beats.append(f'At +{offset:.2f}s of the new footage: {action} {words}')
         prompt=(f'{plan["scene"]} Current state: {active[0]["before"]}. '
-                +' '.join(beats)+' Preserve ongoing motion and audible speech in the carried prefix. '
-                'New dialogue occurs once at its indicated beat. Quiet natural ambience between lines. '
+                +' '.join(beats)+(' Preserve ongoing motion and audible speech in the carried prefix. ' if not plan.get('standalone_scene',False) else ' This standalone scene has no carried audio prefix; speak only its locked script. ')
+                +'New dialogue occurs once at its indicated beat. Quiet natural ambience between lines. '
                 'One continuous real-time take, same characters and location. No captions, writing, watermarks or unrequested props.')
         result.append({'id':f'window-{window.index:03}','event_ids':[e['id'] for e in active],
             'completed_before':[e['id'] for e in plan['events'] if e['end_frame']<=start],

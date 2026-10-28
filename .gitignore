@@ -20,3 +20,12 @@ dist/
 .venv-engine/
 *.dpapi
 .engine-preview/
+
+.venv-text/
+.text-models/
+
+# Large model artifacts, local environments and benchmark output never belong in Git.
+*.safetensors
+*.gguf
+.venv*/
+quality-results*/

@@ -1,0 +1,77 @@
+HostHatch private staging — muhtaj-app — 2026-10-27
+
+Branch: codex/hosthatch-postgres-prep (from local codex/modal-engine-management, 35b0517).
+Do not merge, push, change DNS or edit the shared Caddy configuration without owner approval.
+Never modify /opt/mashhad or its services. The machine already has unrelated production services.
+
+Runtime: Ubuntu 24.04 / Node 24.14.1 / Python 3.12.3 / PostgreSQL 16.
+Strategy: native PostgreSQL + systemd, avoiding installation of Docker or changes to the existing proxy.
+Backend listens ONLY on 127.0.0.1:3107. PostgreSQL listens ONLY on localhost:5432.
+The system service is private staging, not a publication of the current site.
+Keep ENGINE_ALLOW_PAID_ACTIONS=NO.
+
+Server paths:
+ /srv/iraqi-film-forge/current             application source (root-owned, iff read-only)
+ /var/lib/iraqi-film-forge                 private mutable files, iff-owned
+ /etc/iraqi-film-forge/app.env             protected environment, no plaintext token
+ /etc/iraqi-film-forge/master-key          AES-GCM master key, separate from PostgreSQL
+ /etc/iraqi-film-forge/database-password   restricted app DB password
+ /var/backups/iraqi-film-forge             root-only database/files backups
+
+Database:
+ iraqi_film_forge owned by iff_owner NOLOGIN. iff_app has CONNECT/USAGE/DML and sequence use;
+ no superuser, CREATEDB, CREATEROLE, replication, or schema CREATE permissions.
+ engine/migrations/001.sql is explicitly applied to the new empty database as the owner.
+ Server startup NEVER applies migrations or silently imports SQLite.
+ Existing SQLite causes PostgreSQL opening to stop for an approved import. Preserve its original key.
+ Generic JSONB records persist admin identities, project/conversation snapshots, accounts,
+ selections/resources, quotes/approvals, scenes, jobs/events, references and results metadata.
+ Native PostgreSQL sessions, intents, audit and schema-version tables remain separate.
+ Unique live-GPU index and transaction advisory lock protect paid execution across connections.
+ This is the existing administrator-only product, not a completed public multi-user signup service.
+
+Secrets:
+ Modal/HF tokens only enter via authenticated HTTPS admin forms. Ciphertext is account-bound AES-GCM.
+ No token is added to the deployment package or database by the preparation script.
+ App's DB password and master-key file are 0640 root:iff; config directory 0750.
+ Child Modal Python environment strips database and engine credentials.
+ Provision the administrator later from a private server session (password never in chat/argv):
+   cd /srv/iraqi-film-forge/current
+   read -rs -p 'Administrator password (14+ chars): ' ENGINE_ADMIN_PASSWORD; echo
+   export ENGINE_ADMIN_PASSWORD
+   runuser -u iff --preserve-environment -- /usr/local/bin/node --env-file=/etc/iraqi-film-forge/app.env engine/setup.mjs
+   unset ENGINE_ADMIN_PASSWORD
+ Choose the final owner-approved HTTPS domain and allowed origins first. Never bypass invalid certificates.
+ Existing .env files are not auto-loaded; systemd passes --env-file explicitly.
+
+Backups:
+ Daily at 03:30 UTC (06:30 Baghdad), randomized by up to 5 minutes, 7 complete snapshots retained.
+ pg_dump -Fc and private file archive; transfer/metadata caches excluded. MP4 stays outside PG.
+ Master key is deliberately excluded; owner must escrow it separately and securely.
+ restore-check.sh restores into a strictly named disposable database and directory, never the source.
+ Current automatic backup is same-disk protection, NOT protection against whole-server/disk loss.
+ No paid offsite storage is configured. Monitor capacity; 7 large movie copies can exhaust this disk.
+ Files referenced by completed jobs are immutable and written before completion metadata.
+ Before any future destructive file maintenance, coordinate backup consistency; never delete source data here.
+
+Director:
+ New explicit 'حفظ القصة والمحادثة بالخادم' button enables authenticated draft autosave for that page.
+ Local originals remain; restore skips projects whose IDs already exist locally.
+ Draft save stores message/plan/reference metadata; original browser clip blobs do not migrate automatically.
+ Existing uploaded LTX references use the existing immutable file path; model weights remain on Modal.
+
+Pending owner gates:
+ - Domain/DNS selection, live Caddy route change, trusted HTTPS, real CORS/session browser test.
+ - Administrator provisioning and entry of Modal credentials on the protected HTTPS site.
+ - Second-account authorization and genuinely read-only discovery from HostHatch.
+ - Review legacy proxy authentication/rate limiting before public exposure; API key possession alone
+   in old BYO-key routes is not a complete multi-user session/security boundary.
+ - No live SQLite/browser-data import or production migration without an explicit inspected plan.
+ - Largest saved model file is ~39.13 GiB; this server cannot stage it on its current disk.
+   A different approved transfer path or storage expansion must be designed/authorized before transfer.
+ - GPU/Volume/transfer/image build/generation require separate cost approval and real cloud validation.
+
+Official references used:
+ https://node-postgres.com/features/transactions
+ https://node-postgres.com/features/pooling
+ https://www.postgresql.org/docs/16/app-pgdump.html

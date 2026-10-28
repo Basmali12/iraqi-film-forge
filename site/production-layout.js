@@ -1,0 +1,4 @@
+/* Stable layout independent of status/scene count, shared by React and local tests. */
+export function layoutScene(index,projectId){let h=0;for(const c of String(projectId)+':'+index)h=(Math.imul(h,31)+c.charCodeAt(0))|0;const i=Math.max(0,index-1),column=i%4,row=Math.floor(i/4);return {x:420+column*170+(h>>>2)%19-9,y:180+row*210+[105,5,-35,95][column]+(h>>>7)%21-10};}
+export function sceneStatus(status){return status==='done'||status==='completed'?'done':['queued','running','submitted','postprocessing'].includes(status)?'active':['failed','postprocess_failed'].includes(status)?'failed':['uncertain','ambiguous','recovery_required'].includes(status)?'uncertain':status==='stopped'?'stopped':'pending';}
+export function progressOf(completed,total){return Number.isFinite(completed)&&Number.isFinite(total)&&total>0&&completed>=0&&completed<=total?Math.round(100*completed/total):null;}

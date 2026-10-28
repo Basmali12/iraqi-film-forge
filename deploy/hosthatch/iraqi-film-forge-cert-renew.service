@@ -1,0 +1,7 @@
+[Unit]
+Description=Renew Iraqi Film Forge IP certificate (enable only after approved issuance)
+After=network-online.target
+[Service]
+Type=oneshot
+UMask=0077
+ExecStart=/opt/iff-certbot/bin/certbot renew --non-interactive --quiet --cert-name iff-hosthatch-ip --config-dir /etc/iraqi-film-forge-acme --work-dir /var/lib/iraqi-film-forge-acme-client --logs-dir /var/log/iraqi-film-forge-acme --deploy-hook /usr/local/sbin/iraqi-film-forge-install-ip-certificate

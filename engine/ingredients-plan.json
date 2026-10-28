@@ -1,0 +1,24 @@
+{
+  "status": "requires_adapter_license_and_separate_paid_approval",
+  "inferenceReady": false,
+  "metadataChecked": "2026-10-27",
+  "officialWorkflow": "https://github.com/Lightricks/ComfyUI-LTXVideo/blob/master/example_workflows/2.5/LTX-2.5_ICLoRA_Ingredients_Single_Stage_Distilled.json",
+  "repository": "Lightricks/LTX-2.3-22b-IC-LoRA-Ingredients",
+  "revision": "9cb727f45e0b88cfb49ce90cd6c04bbee4dda07e",
+  "file": "ltx-2.3-22b-ic-lora-ingredients-0.9.safetensors",
+  "bytes": 1308778338,
+  "sha256": "515e4e139001ac6282357a5b35372e42e98b3affd5fcc886a52242abeed19559",
+  "gated": true,
+  "licenseURL": "https://huggingface.co/Lightricks/LTX-2.3-22b-IC-LoRA-Ingredients",
+  "undiscountedStorageUSDPerGiBMonth": 0.09,
+  "baseWeightsRedownloadRequired": false,
+  "gpuStarted": false,
+  "weightsDownloaded": false,
+  "nativeAudioReferenceReady": false,
+  "blockingSteps": [
+    "Review and accept this adapter's model license and access requirements",
+    "Implement and validate the native IC-LoRA reference-sheet inference adapter in isolation",
+    "Approve transfer of this additional file into a separate adapter path without changing base READY.json",
+    "Approve one bounded GPU test for memory, native audio, quality and Transformer reuse"
+  ]
+}

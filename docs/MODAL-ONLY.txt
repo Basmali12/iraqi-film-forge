@@ -1,0 +1,4 @@
+Current runtime: OpenAI text API + Modal LTX-2.5 only. 2026-10-28.
+All prior provider routes, keys UI, adapter and paid CLI are retired. Historical docs and projects are retained, not runnable provider integrations.
+Legacy API routes are blocked. Historical successful MP4/IndexedDB clips remain available to view or merge; no automatic provider migration or retry.
+No paid test is part of this removal. The requested 30-second advertisement remains pending a separate execution step after readiness.

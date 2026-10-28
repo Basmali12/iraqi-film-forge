@@ -9,6 +9,7 @@ function dpapi(value,protect) {
  catch{throw Error('WINDOWS_KEYRING_UNAVAILABLE');}
 }
 export function masterKey(folder,{create=false}={}) {
+ if(process.env.ENGINE_MASTER_KEY_FILE)return fs.readFileSync(process.env.ENGINE_MASTER_KEY_FILE,'utf8').trim();
  if(process.env.ENGINE_MASTER_KEY)return process.env.ENGINE_MASTER_KEY;
  if(process.platform!=='win32')return undefined;
  const target=path.resolve(folder,'master-key.dpapi');

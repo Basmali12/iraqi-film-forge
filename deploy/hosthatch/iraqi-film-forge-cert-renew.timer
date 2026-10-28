@@ -1,0 +1,8 @@
+[Unit]
+Description=Check six-day Iraqi Film Forge IP certificate every 6 hours
+[Timer]
+OnCalendar=*-*-* 00,06,12,18:00:00 UTC
+RandomizedDelaySec=1800
+Persistent=true
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,1 @@
+{"compilerOptions":{"target":"ES2022","module":"ESNext","moduleResolution":"Bundler","jsx":"react-jsx","allowJs":true,"checkJs":false,"strict":true,"skipLibCheck":true,"noEmit":true,"lib":["DOM","ES2022"],"esModuleInterop":true},"include":["site/production-network.tsx","site/production-layout.js"]}

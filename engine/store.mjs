@@ -26,5 +26,11 @@ export class Store {
  put(kind,value) {this.db.prepare('INSERT INTO records VALUES(?,?,?) ON CONFLICT(kind,id) DO UPDATE SET data=excluded.data').run(kind,value.id,JSON.stringify(value));return value;}
  delete(kind,id) {this.db.prepare('DELETE FROM records WHERE kind=? AND id=?').run(kind,id);}
  audit(action,subject) {this.db.prepare('INSERT INTO audit VALUES(?,?,?,?)').run(id(),Date.now(),action,subject);}
+ sessionPut(token,value) {this.db.prepare('INSERT INTO sessions VALUES(?,?)').run(token,JSON.stringify(value));}
+ sessionGet(token) {const row=this.db.prepare('SELECT data FROM sessions WHERE token=?').get(token);return row?JSON.parse(String(row.data)):null;}
+ sessionDelete(token) {this.db.prepare('DELETE FROM sessions WHERE token=?').run(token);}
+ intentGet(key) {return this.db.prepare('SELECT job FROM intents WHERE key=?').get(key)?.job??null;}
+ intentPut(key,job) {this.db.prepare('INSERT INTO intents VALUES(?,?)').run(key,job);}
+ async transaction(callback) {this.db.exec('BEGIN IMMEDIATE');try{const result=await callback();this.db.exec('COMMIT');return result;}catch(e){this.db.exec('ROLLBACK');throw e;}}
  close() {this.db.close();this.key.fill(0);}
 }

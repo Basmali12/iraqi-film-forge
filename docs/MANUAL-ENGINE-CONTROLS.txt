@@ -1,0 +1,26 @@
+Manual engine controls — 2026-10-27
+
+The engines page no longer exposes execution timeout, startup timeout or a
+per-job budget number. It sends timeout=0, startup=0 and budget=0 for new
+operations. These are application sentinels, not values forwarded to Modal.
+
+budget=0 disables the application per-job budget watchdog. It is not a zero
+dollar budget. timeout=0 maps to Modal's documented maximum execution timeout
+of 86400 seconds; startup=0 omits the separate startup timeout and inherits
+the execution timeout. There is no claim of infinite Modal execution.
+Reference: https://modal.com/docs/guide/timeouts
+
+The existing 20-minute idle shutdown, manual stop, one-job/idempotency rules,
+explicit paid consent, account isolation and model/audio settings remain.
+Any separately configured application monthly limit is still honored; an
+open-ended plan cannot silently bypass it. Modal billing settings are untouched.
+
+Manual quotes show the resource rate and an unknown final duration/cost,
+instead of inventing a total from a zero-second duration. Active manual jobs
+contribute elapsed-time estimates to the application spending ledger.
+
+Legacy clients and historical jobs with nonzero values retain their behavior.
+A prepared GPU session retains its original settings until it ends; the site
+never restarts a paid session merely to change these controls.
+
+This change does not start a GPU, transfer weights, or run a cloud test.

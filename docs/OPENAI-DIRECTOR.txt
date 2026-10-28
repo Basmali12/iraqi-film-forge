@@ -1,0 +1,54 @@
+CURRENT REVISION: see docs/UNIFIED-FILM-WORKBENCH.txt. Monthly text cap is now disabled; film.html is the single creation UI, director.html redirects. The following implementation notes describe the earlier development stage.
+
+OpenAI director and production network — 2026-10-28 Baghdad
+
+Shared administrator settings on engines.html, film.html, director.html.
+OpenAI key saved with existing AES-256-GCM server store and separate master key.
+GET returns configured/savedAt/model/pricing/budget only, never key/ciphertext.
+Saving an empty field preserves the saved key; placeholder indicates saved state after reload.
+Key verification uses the official non-generating GET /v1/models/gpt-6-luna.
+Only the administrator's normal HTTPS session and CSRF can save/unlink/start text requests.
+No key is written to browser storage, source files, responses or logs.
+Changing code/restarting the site does not clear the PostgreSQL configuration.
+
+Model: gpt-6-luna. Responses API, store:false, reasoning effort none, no tools.
+Standard text pricing checked 2026-10-28: $0.10/M input, $0.01/M cached input,
+$0.50/M output. Prices must be revalidated before a future model/rate change.
+Invoices are not available here; usage-derived costs are explicitly separate.
+Monthly text allowance defaults to $2 in the application; not a provider invoice guarantee.
+Request outputs capped at 1600 discussion / 6000 planning tokens, contexts at96KB.
+No automatic retry, fallback or model upgrade. One text request at a time.
+Request IDs are reserved durably before dispatch; repeated IDs return the existing request.
+Interrupted requests become uncertain and are not automatically resent.
+Network responses are bounded, use a fixed official destination and refuse redirects.
+Background requests do not block the engine stop/status API request queue.
+
+Discussion returns structured reply, proposed total film duration/style/missing inputs,
+and an optional portrait description. It does not generate portraits or verify licenses.
+Writing intent requires a previously proposed unchanged duration and user writing agreement.
+When that agreement is received, the existing beat/scene planner prepares TEXT only.
+The complete film duration is separate from the current10-second GPU scene window.
+Plans support30–3600 seconds, aligned to supported10-second Modal/15-second HeyGen windows.
+Long plan creation is bounded and may stop on text-budget or context constraints.
+Video still requires real engine readiness and film-level cost approval; no GPU from chat.
+Each Modal scene is generated sequentially using the real prior-frame path; no video retry.
+Images in the creative library remain stored references, not active Ingredients conditioning.
+Voice/face matching and native multi-scene sound continuity are not guaranteed.
+
+Graph view on director and film: opens within the same document to preserve the browser
+generation worker; no actual navigation that would kill sequential generation.
+Shows actual slot/job status and completed-scene counts, no synthetic time-based percentage.
+Covers are captured from completed stored video blobs only. Unknown ETA remains unknown.
+Scene graph has pause-after-current-scene and links to actual GPU stop controls.
+Returning to discussion doesn't cancel an already-submitted cloud call.
+Closing the browser can halt local orchestration; it does not guarantee cloud cancellation.
+Successful MP4s, original scene blobs and legacy OpenRouter/HeyGen projects are preserved.
+
+Verification is local/offline with injected official-API response fixtures until an admin
+enters a real key through the site's protected field. No real paid OpenAI or Modal call is
+part of implementation verification. Never describe fixtures as a real provider success.
+
+Official sources:
+https://developers.openai.com/api/docs/models/gpt-6-luna
+https://developers.openai.com/api/docs/guides/structured-outputs
+https://developers.openai.com/api/docs/guides/conversation-state

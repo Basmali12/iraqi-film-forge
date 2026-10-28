@@ -1,0 +1,11 @@
+# Approval required before importing into the live Caddyfile.
+# This route serves ACME validation only. It does not serve the application.
+http://167.104.162.4 {
+    handle /.well-known/acme-challenge/* {
+        root * /var/lib/iraqi-film-forge-acme-webroot
+        file_server
+    }
+    handle {
+        respond "Not available" 404
+    }
+}

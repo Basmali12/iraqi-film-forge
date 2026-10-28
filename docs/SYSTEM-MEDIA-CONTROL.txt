@@ -1,0 +1,54 @@
+Shared native media controls — local implementation, October 2026
+
+Scope: the three Modal/LTX surfaces: engines.html, film.html and director.html.
+Legacy OpenRouter/HeyGen requests are preserved and do not silently change provider.
+
+Implemented:
+- One authenticated, persistent character/prop library on HostHatch, independent of Modal
+  accounts. Versioned optimistic updates and history prevent silent lost changes.
+- Names, appearance, wardrobe, voice descriptions, dialect and immutable private reference
+  images. Reference images are explicitly described as stored, not active Ingredients inputs.
+- Per-scene speaker/listener/quoted line selections and prop selections enter the actual
+  generation quote and saved job snapshot. Unknown actors, self-listeners and invalid
+  explicit response links are rejected. Only selected cast/props enter this contract.
+- Existing successful scenes and their originals are not rewritten. Generated images,
+  identity, dialogue and props remain probabilistic and need a future approved GPU test.
+- DeepFilterNet v0.5.6 CPU executable from the official Rikorose release, hash pinned.
+  No external TTS, voice replacement, OpenAI subscription or CUDA processing.
+- Optional global audio cleanup setting, disabled by default pending listening comparison.
+  Explicit manual cleanup of completed videos is also available.
+- Queued CPU processing, one worker, deduplication, durable phases, no automatic retry.
+  A failed cleanup never turns a successful generation into a failed job.
+- Mild 3/6/12 dB attenuation limits; original audio and MP4 stay available. Derived video
+  uses stream-copy and verifies identical encoded video packet hashes, duration, stereo/
+  channel count, 48kHz audio and source file hashes before publishing the variant.
+- Automatic film assembly can select derived audio clips while keeping original clip blobs.
+  CPU cleanup may add GPU idle time while a prepared session remains allocated.
+
+Real local verification:
+DeepFilterNet processed a saved 10-second stereo clip on Windows CPU in about 3.48 seconds.
+The resulting WAV is an unreviewed denoising candidate, not a proven dialect/voice fix.
+No audio-input listening capability exists in the assistant tool, so user listening is needed.
+Local unit/API tests cover role binding, optimistic library writes, auth, image immutability,
+missing dependencies, one CPU worker, duplicate clicks, failures and explicit restart recovery.
+
+Additional model path remains blocked, not simulated:
+Official Ingredients workflow uses ltx-2.3-22b-ic-lora-ingredients-0.9.safetensors
+with LTX-2.5. Public metadata: 1,308,778,338 bytes (about 1.22GiB), revision
+9cb727f45e0b88cfb49ce90cd6c04bbee4dda07e, SHA256
+515e4e139001ac6282357a5b35372e42e98b3affd5fcc886a52242abeed19559.
+List storage approximately $0.11/account/month before allowances; transfer, compute and
+first image build are separate. This gated model requires license/access review.
+No Ingredients weight, additional Volume, GPU or new LTX inference was started.
+The native reference-sheet inference adapter and native audio-reference path are not yet
+implemented/validated; the API refuses enabling them and the UI exposes a metadata plan.
+Stored images and voice descriptions are not advertised as face or voice cloning.
+
+Environment additions (no secret values): ENGINE_AUDIO_CLEANUP_BIN,
+ENGINE_AUDIO_CLEANUP_SHA256, ENGINE_FFMPEG_BIN, ENGINE_FFPROBE_BIN.
+The CPU executable must be root-owned/non-writable by the service, and SHA256 is checked.
+Child processes receive only a minimal non-secret environment.
+
+Model licensing: https://huggingface.co/Lightricks/LTX-2.3-22b-IC-LoRA-Ingredients
+Official workflow: https://github.com/Lightricks/ComfyUI-LTXVideo/tree/master/example_workflows/2.5
+Audio tool: https://github.com/Rikorose/DeepFilterNet/releases/tag/v0.5.6

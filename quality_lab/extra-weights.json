@@ -1,0 +1,21 @@
+{
+  "checked_date": "2026-10-28",
+  "files": [
+    {
+      "repo": "Lightricks/LTX-2.5",
+      "revision": "49b093a39c19169a8a81721dcc541e07e945232f",
+      "source_file": "vae/ltx-2.5-video-vae-bf16.safetensors",
+      "relative_path": "vae/ltx-2.5-video-vae-bf16.safetensors",
+      "size": 1472223346,
+      "sha256": "847e14ca7f3355debca0cea4eaa24ac0fbcdf0061da054ac89ca638a869ddba3"
+    },
+    {
+      "repo": "Lightricks/LTX-2.5-22b-IC-LoRA-Pixel-Spatial-Upscaler",
+      "revision": "59f26f1e0c11af42f1affa924b4ef231e9e98b2a",
+      "source_file": "ltx-2.5-22b-ic-lora-pixel-spatial-upscaler-x2-1.0.safetensors",
+      "relative_path": "quality-lab/59f26f1e0c11af42f1affa924b4ef231e9e98b2a/ltx-2.5-22b-ic-lora-pixel-spatial-upscaler-x2-1.0.safetensors",
+      "size": 327322640,
+      "sha256": "984851b769ea2bcb4c9e0a239a7676239e42c6a6001ddc69943b41ff0b283c1d"
+    }
+  ]
+}

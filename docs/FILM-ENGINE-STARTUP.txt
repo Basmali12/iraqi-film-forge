@@ -1,0 +1,20 @@
+Film engine selection and early warmup — 2026-10-27
+
+Provider selection is mandatory on entry; no paid work occurs from selection or polling.
+The Done button unlocks story preparation while Modal startup continues on the backend.
+The shared engine can be started/stopped from either film.html or engines.html.
+Start first fetches current state and a server cost quote. Separate confirmation consumes
+that quote once. A live/uncertain job blocks a second allocation; no automatic retry.
+Production is disabled until real server readiness for the selected account/GPU arrives.
+State is re-read after reload, on update click, and every three seconds while Modal is selected.
+Counters are actual phase progress only; no invented overall percentage or ETA.
+Remaining preparation time stays unknown until sufficient measured data is implemented.
+The existing source/weights, CPU offload, Conv VAE, native audio and idle stop policy remain.
+No GPU allocation is part of UI verification or publication itself.
+
+Free checks: 100 JS tests (99 pass, 1 PostgreSQL skip), 65 Python tests (64 pass, 1
+platform/Caddy skip), check/TypeScript/build pass. Six new controller tests exercise
+quote/approval separation, duplicate prevention, missing auth, GPU mismatch, expiry,
+explicit stop acknowledgement, and readiness gating.
+Browser check: mandatory empty choice, Modal controls, Done unlocks editing, original
+60-second project restores, generation remains disabled when backend is unavailable.

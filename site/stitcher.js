@@ -1,5 +1,5 @@
 /* Iraqi Film Forge local video stitcher.
- * Browser-only FFmpeg.wasm; no video uploads, no OpenRouter calls.
+ * Browser-only FFmpeg.wasm; no video uploads, no external provider calls.
  * Based on ffmpegwasm/ffmpeg.wasm MIT / discussion #580.
  */
 "use strict";
@@ -137,5 +137,22 @@
       for(const filename of tempFiles){try{await ffmpeg.deleteFile(filename)}catch{}}
     }
   }
-  global.IraqiFilmStitcher={merge,inspect};
+  async function normalize720(blob,ratio='9:16',report=()=>{}){
+    const target=ratio==='16:9'?{width:1280,height:720}:{width:720,height:1280},before=await inspect(blob);
+    if(before.width===target.width&&before.height===target.height)return blob;
+    if(before.width<target.width||before.height<target.height)throw Error('المصدر أقل من720p؛ لا نرفع دقة وهمية ولا نعدّل الأصل.');
+    if(blob.size>140*1024*1024)throw Error('الفيديو كبير على ذاكرة المتصفح؛ المصدر محفوظ.');
+    const ffmpeg=await loadEngine(report),input='normalize-source.mp4',output='normalize-720.mp4';
+    try{
+      await ffmpeg.writeFile(input,new Uint8Array(await blob.arrayBuffer()));report('تهيئة نسخة720p على CPU المتصفح؛ الأصل والصوت محفوظان.');
+      const filter='scale='+target.width+':'+target.height+':force_original_aspect_ratio=increase,crop='+target.width+':'+target.height+',setsar=1';
+      const code=await ffmpeg.exec(['-hide_banner','-loglevel','error','-i',input,'-map','0:v:0','-map','0:a:0','-vf',filter,'-c:v','libx264','-preset','ultrafast','-crf','20','-pix_fmt','yuv420p','-c:a','copy','-movflags','frag_keyframe+empty_moov+default_base_moof',output],240000);
+      if(code!==0)throw Error('تعذر توحيد720p؛ فيديو المزود ناجح والأصل محفوظ.');
+      const data=await ffmpeg.readFile(output);if(data.byteLength<1024)throw Error('ملف720p غير صالح؛ الأصل محفوظ.');
+      const normalized=new Blob([new Uint8Array(data)],{type:'video/mp4'}),after=await inspect(normalized);
+      if(after.width!==target.width||after.height!==target.height||Math.abs(after.duration-before.duration)>.1)throw Error('فشل التحقق من نسخة720p؛ الأصل محفوظ.');
+      return normalized;
+    }finally{for(const name of [input,output])try{await ffmpeg.deleteFile(name);}catch{}}
+  }
+  global.IraqiFilmStitcher={merge,inspect,normalize720};
 })(window);

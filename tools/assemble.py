@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stitch completed HeyGen clips with audio, optional short synchronized dissolve.
+"""Stitch completed video clips with audio, optional short synchronized dissolve.
 
 This utility runs FFmpeg locally (no GPU and no additional video API costs).
 It cannot guarantee continuity of acting, voices or camera motion between AI shots.

@@ -1,0 +1,3 @@
+# Isolated certificate client; never install into the Modal runtime environment.
+# Version 5.4 is the first documented release supporting IP webroot validation.
+certbot==5.4.0

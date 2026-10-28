@@ -18,3 +18,5 @@
 .character-card input[type=url]{margin:6px 0 12px;direction:ltr;text-align:left}
 .character-card textarea{font-size:13px}
 #approveCharacters:disabled{opacity:.5}
+
+#filmEngineProgress{width:100%;height:16px;accent-color:#45d7b1}#filmEngineStages .done{color:#86efac}#filmEngineStages .current{color:#8bc0ff}#filmEngineApproval{max-width:min(560px,90vw);background:#132337;color:#e7f0ff;border:1px solid #3d6d80;border-radius:16px}#filmEngineQuote{white-space:pre-wrap;font:inherit}#filmEngineApproval::backdrop{background:#0009}[inert]{opacity:.55}#filmProviderDone{margin-top:12px}

@@ -1,0 +1,59 @@
+LOCAL IMPLEMENTATION — NOT DEPLOYED OR GPU-TESTED AS A SERVICE
+2026-10-28
+
+Main inference profile: LTX-2.5 Distilled + official DFRPipeline + Diffusion VAE.
+Pinned upstream: e98f6d927d83c92ef2be6aec76c8440b19306e39.
+RTX PRO 6000, CPU offload, FP8 weight casting / BF16 computation, native audio.
+10-second scenes / 241 native frames; final 720p portrait or landscape.
+The prior Conv engine is excluded from the active image and has no fallback.
+Historical source/tests/media and shared Volume weights remain intact.
+The earlier successful paid CLI experiment is evidence for the official path,
+not proof that this new long-lived service adapter has passed a cloud test.
+DFR construction is lazy: readiness is not a claim that Transformer is resident.
+
+Required weights
+production-profile.json is the active six-component contract. Discovery is
+read-only, and missing components block GPU startup before any paid request.
+The older five-file source manifest remains for preserving historical transfers.
+New-account provisioning does NOT yet provision the two DFR additions; it must
+be extended/tested separately with a quoted and explicitly approved transfer.
+Do not silently fall back, switch accounts, create Volumes or redownload weights.
+
+On-screen writing
+Fixed generation directions prohibit captions, lettering and logos. Native
+video/audio markers are disabled. Instructions alone cannot guarantee compliance.
+After rendering, a CPU-only multiscale detector checks every decoded frame.
+Captioned results enter needs_review and are not accepted as completed scenes;
+the automatic film chain stops without another paid generation.
+Raw MP4 and cloud success are preserved independently from local quality status.
+Clean results retain the original audio bitstream and last-frame continuation.
+OCR cannot prove absence of every decorative/vertical/tiny glyph. Review remains
+necessary. Small clothing-button detections are excluded using documented shape
+criteria, which can also miss short decorative marks; this is not a guarantee.
+
+CPU repair is EXPERIMENTAL, OFF in production. Initial Telea tests smeared the
+tray and missed background lettering. OpenCV LaMa proved too slow in the full
+clip test, which was stopped locally. Do not publish those experimental clips.
+The --repair-text option exists for explicit offline investigation only, never
+for automatic paid retries. It can affect image details and temporal consistency.
+No external voice engine, paid cloud job or new GPU was used in this change.
+
+Server prerequisites before rollout
+Create a separate CPU Python environment using engine/text-requirements.lock.
+ENGINE_TEXT_QC_PYTHON must be its absolute Python executable path.
+ENGINE_TEXT_DETECTOR_MODEL points to the pinned Tiny detector below.
+RapidOCR's packaged Small detector is hash-verified too.
+ENGINE_FFMPEG_BIN can select the installed CPU ffmpeg executable.
+The worker receives only a small OS/model-path environment allowlist, no keys.
+CPU worker deadline is 900 seconds, with scoped process-tree cleanup.
+The backend must be deployed with both detector files before startup quotes pass.
+Do not activate an old Conv session after the quality contract changes.
+
+Detector provenance
+RapidOCR 3.10.0, Apache-2.0: https://github.com/RapidAI/RapidOCR
+Tiny: https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.10.0/onnx/PP-OCRv6/det/PP-OCRv6_det_tiny.onnx
+SHA256 f42c0fbd294d95eac1a550e131b277dac97462c8025fa4b6c3cec1b7894bd3d5
+Packaged Small SHA256 090f04abcd9d9a7498bc4ebf677e4cb9bdce1fe4197ddb7e529f1ef44e1ff94f
+Optional experimental inpainting: https://huggingface.co/opencv/inpainting_lama
+SHA256 7df918ac3921d3daf0aae1d219776cf0dc4e4935f035af81841b40adcf74fdf2
+Model binaries and virtual environments are excluded from Git.

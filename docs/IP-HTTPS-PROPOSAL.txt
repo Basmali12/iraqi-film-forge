@@ -1,0 +1,70 @@
+HostHatch / GitHub Pages / no purchased domain — 2026-10-27
+
+Existing site (HTTP 200 verified): https://basmali12.github.io/iraqi-film-forge/
+It remains on GitHub Pages. Its github.io DNS is controlled by GitHub, not HostHatch.
+No CNAME/custom domain file was found in this checkout. Do not change Pages or DNS.
+
+Proposed NEW preview address: https://167.104.162.4
+Same-origin browser administration/generation on this copy avoids reliance on cross-site cookies.
+The original GitHub Pages site is not redirected, replaced, or updated by this proposal.
+Do not claim that a Pages cross-origin cookie integration is tested or complete.
+
+Official supported certificate path:
+ - Let's Encrypt shortlived IP certificate (160 hours), Certbot >=5.4 for webroot.
+ - Isolated pinned Certbot 5.4.0 at /opt/iff-certbot, separate from Modal's venv.
+ - No purchase, paid DNS, third-party shared free hostname, or subscription.
+ - Automated renewal check every 6 hours, randomized up to 30 minutes.
+ - Certificate and private key are outside PostgreSQL and Git, root:caddy 0640.
+ - Deploy hook refuses untrusted staging certs, validates IP/expiry/key pairing,
+   switches the certificate symlink atomically, validates Caddy as its service user,
+   reloads without stopping the proxy, and rolls back an existing certificate on failure.
+
+Source deployment permissions:
+ Extract Windows archives as root with --no-same-owner --no-same-permissions and umask 022.
+ Application code/dependencies must stay root-owned, without group/other write permission.
+ verify-source-readonly.py runs as iff before service startup and rejects writable code.
+ Only /var/lib/iraqi-film-forge is mutable by the application; keys/config remain separate.
+
+Prepared only, NOT ACTIVATED:
+ deploy/hosthatch/Caddyfile.ip-bootstrap.fragment (HTTP ACME token files only; everything else 404)
+ deploy/hosthatch/Caddyfile.ip-https.fragment (trusted TLS + reverse proxy to loopback 3107)
+ deploy/hosthatch/prepare-ip-https.py (offline candidate generation/check; cannot activate/reload)
+ deploy/hosthatch/install-ip-certificate.sh (future deploy hook, not yet installed/enabled)
+ deploy/hosthatch/iraqi-film-forge-cert-renew.{service,timer} (not enabled before approval)
+
+Publication boundary:
+ The proposed IP preview denies /api/v1/* and /api/director/* at Caddy with 403.
+ These legacy BYO-key proxies are not approved for internet exposure until their server-side
+ auth/rate/budget controls are completed. Their source and the original Pages site are preserved.
+ Engine routes keep existing administrator auth, HTTPS, CSRF, origin checks and paid gate.
+ PostgreSQL and the Node backend remain loopback only. ENGINE_ALLOW_PAID_ACTIONS stays NO.
+ The owner still must provision a private administrator password. Do not send it in chat.
+
+After explicit owner approval ONLY, activation steps:
+ 1. Check live Caddy SHA256 still equals the reviewed plan; abort/review if it changed.
+ 2. Save root-private snapshots of live Caddyfile and app.env for rollback.
+ 3. Add ONLY the IP HTTP ACME route, validate the combined Caddy config, reload without restart.
+ 4. Confirm HTTP token serving from outside; no application or credentials over HTTP.
+ 5. Run isolated Certbot's dry-run, then one real trusted issuance if the dry-run succeeds.
+    Use own directories and no email registration; the owner authorizes ACME registration/terms
+    with the certificate request. Do not take down the existing server for standalone mode.
+ 6. Verify the real trusted chain, IP SAN, expiry and private-key match. Install the deploy hook
+    and certificate files; never install the test-only or staging certificate.
+ 7. Add ONLY the exact IP HTTPS route; preserve all existing hostname routes.
+ 8. Change only this app's ENGINE_ORIGIN/ALLOWED_ORIGINS to https://167.104.162.4 and
+    ENGINE_TRUST_PROXY to loopback. Preserve ENGINE_ALLOW_PAID_ACTIONS=NO and all keys.
+ 9. Restart only iraqi-film-forge after confirming it has no active jobs; validate/reload Caddy.
+ 10. Enable the isolated renewal timer, test renewal hooks and browser HTTPS without exceptions.
+ 11. Provision administrator through a hidden private server prompt, then verify login, CSRF,
+     unauthorized access, Modal credential form and new preview. No GPU/transfer permitted.
+ 12. Check the existing shared hostname/service is unchanged; on failure restore only our changes.
+
+No actual issuance, public route activation, ACME registration, shared proxy reload, DNS change,
+GitHub publication, admin-password creation, Modal resources or paid execution is authorized yet.
+Offline self-signed test CA is disposable, trusted only inside the loopback test client;
+it is not installed into Windows/Linux trust stores or served to the public/browser.
+
+Sources:
+https://letsencrypt.org/2026/01/15/6day-and-ip-general-availability
+https://letsencrypt.org/2026/03/11/shorter-certs-certbot
+https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/about-custom-domains-and-github-pages

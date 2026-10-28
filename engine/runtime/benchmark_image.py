@@ -17,7 +17,7 @@ def make_image():
         .run_commands('python -m pip install --no-build-isolation --no-deps /opt/LTX-2/packages/ltx-core /opt/LTX-2/packages/ltx-pipelines',
                       'python -m pip check')
         .env(STATIC_ENV)
-        .add_local_dir(ROOT,remote_path='/root',copy=True,ignore=['**/__pycache__/**','**/*.pyc']))
+        .add_local_dir(ROOT,remote_path='/root',copy=True,ignore=['**/__pycache__/**','**/*.pyc','engine.py']))
 
 def check_image():
     image=modal.Image.debian_slim(python_version='3.12')

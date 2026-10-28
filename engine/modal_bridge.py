@@ -126,6 +126,26 @@ def discover(request):
     return result
 
 
+def quality_discover(request):
+    """Metadata only: separate active quality readiness from legacy base storage."""
+    import modal
+    c,workspace=client(request['credentials'])
+    profile=json.loads((ROOT/'runtime/production-profile.json').read_text())
+    volume=modal.Volume.from_name(request['volume'],create_if_missing=False,client=c,environment_name='main')
+    try:entries={e.path.lstrip('/'):e for e in volume.listdir(PREFIX,recursive=True)}
+    except Exception:return {'ready':False,'profile':profile['id'],'files':[],'workspace':workspace}
+    files=[]
+    for name,spec in profile['files'].items():
+        entry=entries.get((PREFIX+'/'+name).lstrip('/'))
+        files.append({'name':name,'size':entry.size if entry else None,'expectedSize':spec['size'],
+                      'present':bool(entry and entry.size==spec['size'])})
+    marker=entries.get((PREFIX+'/READY.json').lstrip('/'));ready=False
+    if marker and marker.size<65536:
+        saved=json.loads(b''.join(volume.read_file(PREFIX+'/READY.json')))
+        ready=saved.get('revision')==profile['model_revision'] and all(f['present'] for f in files)
+    return {'ready':ready,'profile':profile['id'],'files':files,'workspace':workspace,'hashVerifiedNow':False}
+
+
 def transfer(request):
     import modal
     if not request.get('paidApproved'):
@@ -244,10 +264,14 @@ def main():
     if action=='verify':
         _, workspace=client(request['credentials']);result={'workspace':workspace,'verified':True,'capacity':'unknown'}
     elif action=='discover':result=discover(request)
+    elif action=='quality_discover':result=quality_discover(request)
     elif action in ('inspect','stop'):
         client(request['credentials'])
         result=sync_metadata(request['credentials'],request['appId'],request['jobId'],action=='stop',started_at=request.get('startedAt'))
     elif action=='transfer':result=transfer(request)
+    elif action.startswith('cloud_transfer_'):
+        from cloud_transfer_host import run
+        result=run(request)
     elif action=='official_plan':result=official_model_info(request)
     elif action in ('generate','session'):
         from gpu_host import run

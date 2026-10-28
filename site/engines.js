@@ -1,67 +1,103 @@
 'use strict';
-const el=id=>document.getElementById(id),api=window.EngineAPI;
-let snapshot=null,currentQuote=null,busy=false,restored=false;
-const labels={queued:'بانتظار البدء',running:'جارٍ التنفيذ',ready:'جاهز للتوليد',completed:'اكتملت',stopped:'متوقف',stopping:'جارٍ الإيقاف',uncertain:'حالة غير مؤكدة — لا تعِد التشغيل',recovery_required:'يلزم فحص الحالة بعد إعادة تشغيل الخادم',needs_review:'تغيّرت سلامة الملفات — راجع خطة جديدة قبل النقل',failed:'فشلت العملية؛ لا إعادة تلقائية'};
-const bytes=n=>n===undefined||n===null?'غير معروف':(n/2**30).toFixed(2)+' GiB';
-const node=(tag,text,cls)=>{const e=document.createElement(tag);e.textContent=text;if(cls)e.className=cls;return e;};
-function notify(text){el('notice').textContent=text;}
-function values(){return {gpu:el('gpu').value,cpu:Number(el('cpu').value),ram:Number(el('ram').value),timeout:Number(el('timeout').value),startup:Number(el('startup').value),budget:Number(el('budget').value),seed:42};}
-function accountId(){if(!el('account').value)throw Error('اربط حساباً واختره أولاً');return el('account').value;}
-function inspect(value){el('inspection').textContent=JSON.stringify(value,null,2);}
-async function act(fn){if(busy)return;busy=true;try{await fn();await refresh();}catch(e){notify(e.message);}finally{busy=false;}}
-async function refresh(){
- snapshot=await api.request('state');el('dashboard').hidden=false;el('loginPanel').hidden=true;
- if(!restored){for(const [field,value] of Object.entries(snapshot.selection?.settings||{}))if(el(field))el(field).value=value;restored=true;}
- el('paidState').textContent=snapshot.allowPaid?'تفعيل مشروط بالموافقة':'العمليات المدفوعة مقفلة بالخادم';
- const prior=el('account').value;el('account').replaceChildren();el('accounts').replaceChildren();
- for(const a of snapshot.accounts){const opt=node('option',a.label+' / '+a.workspace);opt.value=a.id;el('account').append(opt);const card=node('div','', 'account');card.append(node('strong',a.label+' — '+a.workspace),node('div',a.role==='primary'?'الحساب الأساسي · التخزين للقراءة فقط':'حساب احتياطي'),node('small',a.discovery?.ready?'الأوزان موجودة؛ GPU غير محمّل بالضرورة':'يحتاج فحصاً أو تجهيزاً'));el('accounts').append(card);}
- if(snapshot.accounts.some(a=>a.id===prior))el('account').value=prior;else if(snapshot.selection)el('account').value=snapshot.selection.accountId;
- const a=snapshot.accounts.find(x=>x.id===el('account').value),live=[...snapshot.jobs].reverse().find(j=>j.accountId===a?.id&&!j.cloudStopped&&['running','ready','stopping','uncertain','recovery_required'].includes(j.status));el('engineStatus').textContent=live?(labels[live.status]||live.status):a?(a.discovery?.ready?'جاهز للتشغيل عند الطلب':'يحتاج تجهيز أو فحص'):'غير مربوط';
- el("ledger").textContent="الشهر "+snapshot.spending.month+" · تقدير/حجز حوسبة $"+snapshot.spending.estimatedOrReservedUSD.toFixed(4)+" · الحد: "+(snapshot.spending.limitUSD??"غير محدد");
- renderJobs();
+const el=id=>document.getElementById(id),api=window.EngineAPI,model=window.PrimaryEngineModel;
+let snapshot=null,view=null,quote=null,busy=false,restored=false,loadedVideo=null,accountOptions='',draftTimer,draftTouched=false,draftSave=Promise.resolve(),preparedSource=null,approvedPrompt=null,renewingAccount=null;
+const labels={start:'تحميل المحرك فقط، دون توليد تلقائي',generate:'إنشاء فيديو واحد على نفس المحرك',prepare:'تجهيز الحساب ونقل الأوزان — دون GPU'};
+const gib=n=>(Number(n||0)/2**30).toFixed(2)+' GiB';
+function notice(text){el('notice').textContent=/^[A-Z][A-Z_0-9]+$/.test(String(text))?model.explainError(text):text;}
+function values(){return {gpu:'RTX-PRO-6000',cpu:4,ram:96,timeout:0,startup:0,idleSeconds:1200,budget:0,seed:42,orientation:'portrait'};}
+async function action(fn){if(busy)return;busy=true;render();try{await fn();}catch(error){notice(model.explainError(error.message));}finally{busy=false;await refresh().catch(error=>notice(model.explainError(error.message)));}}
+async function refresh(){snapshot=await api.request('state');if(!restored){for(const [field,value] of Object.entries(snapshot.selection?.settings||{}))if(el(field))el(field).value=value;restored=true;}render();}
+function render(){
+ if(!snapshot)return;view=model.derive(snapshot);
+ const optionsKey=JSON.stringify(snapshot.accounts.map(a=>[a.id,a.workspace,a.activated,a.discovery?.ready]));
+ if(optionsKey!==accountOptions){accountOptions=optionsKey;el('accountSelect').replaceChildren();for(const a of snapshot.accounts){const option=document.createElement('option');option.value=a.id;option.textContent=a.workspace+(a.role==='primary'?' — الأساسي':a.activated===false?' — يحتاج إكمال التجهيز':' — محفوظ');el('accountSelect').append(option);}}
+ el('accountSelect').value=view.account?.id||'';
+ const occupied=snapshot.jobs.some(j=>!j.cloudStopped&&!(j.status==='completed'&&j.attachedEngineId&&j.result?.videoVerified));
+ el('accountSelect').disabled=busy||occupied;
+ el('accountName').textContent=view.account?.workspace||'لا يوجد حساب مربوط';el('accountRole').textContent=view.account?.role==='primary'?'الحساب الأساسي':'الحساب المحدد';
+ const tracked=model.trackedJob(view),progress=model.progress(tracked);el('liveProgress').hidden=!tracked;
+ el('liveTitle').textContent=progress.finished&&view.state==='ready'?'اكتمل الفيديو — المحرك جاهز لمشهد آخر':view.title;el('liveStage').textContent=progress.label;
+ const bar=el('phaseProgress');if(progress.completed!==null){bar.max=progress.steps;bar.value=progress.completed;}else{bar.removeAttribute('value');}
+ const transfer=model.byteProgress(tracked);
+ if(tracked?.action==='prepare'&&transfer){bar.max=transfer.total;bar.value=transfer.completed;}
+ if(progress.denoiseTotal!==null){bar.max=progress.denoiseTotal;bar.value=progress.denoiseCompleted;}
+ bar.hidden=!view.active||progress.idle||progress.finished||(tracked?.action==='generate'&&progress.denoiseTotal===null&&progress.completed===null);
+ const finishedText=progress.finishedType==='video'?'اكتمل الفيديو 100%':progress.finishedType==='probe'?'اختبار 64KiB مكتمل؛ الحساب يحتاج نقل الأوزان':progress.finishedType==='verification'?'اكتمل فحص الموجود في حساب الوجهة؛ لا نقل جديد':'اكتملت الأوزان؛ احفظ الحساب';
+ const byteText=transfer?(transfer.phase==='integrity'?'فحص بصمة الوجهة: ':'قراءة المصدر: ')+gib(transfer.completed)+' / '+gib(transfer.total)+'؛ السرعة: '+(transfer.rate===null?'غير معروفة':(transfer.rate/2**20).toFixed(1)+' MiB/ثانية'):'عداد هذه المرحلة غير متاح؛ لا نعرض نسبة رفع غير مقاسة';
+ el('liveCounter').textContent=progress.cancelled?'المهمة متوقفة؛ الملفات المحفوظة باقية.':progress.finished?finishedText:progress.idle?'جاهز لوصف جديد؛ انتظار GPU مدفوع':tracked?.action==='prepare'?byteText+'؛ ملفات تحقق منها: '+(tracked.verifiedFiles?.length||0):progress.denoiseTotal!==null?'خطوات التوليد: '+progress.denoiseCompleted+' / '+progress.denoiseTotal+' ('+progress.percent+'٪) — فك الفيديو والحفظ لاحقاً':progress.completed!==null?'خطوات المرحلة: '+progress.completed+' / '+progress.steps:'المراحل المكتملة: '+progress.done+' / '+progress.total+'؛ لا تمثل نسبة الزمن';
+ el('liveError').hidden=!progress.error;el('liveError').textContent=progress.error||'';
+ el('progressHint').textContent=progress.cancelled?'تأكد توقف الموارد؛ لا توجد إعادة محاولة تلقائية.':progress.finished?(progress.finishedType==='video'?'انتهى إنشاء الفيديو. بقاء GPU جاهزاً حالة منفصلة وقد يُحاسب عليها.':'انتهت مهمة CPU وتأكد توقف مواردها؛ التخزين الدائم يبقى.'):progress.idle?'لا توجد عملية توليد قيد التنفيذ.':'الوقت المتبقي: غير معروف. الأرقام تتغير فقط عند وصول خطوات فعلية.';
+ el('engineStatus').textContent=view.title;el('statusDetail').textContent=view.detail;el('statusOrb').className='status-orb '+view.state;
+ el('powerToggle').textContent=view.action==='stop'?'إيقاف':view.action==='reconcile'?'تحقق من الإيقاف':view.action==='prepare'?'تجهيز الحساب':view.action==='activate'?'حفظ والبدء':'تشغيل';
+ el('powerToggle').className='power-toggle'+(view.action==='stop'?' danger':'');el('powerToggle').disabled=busy||!view.action||view.state==='stopping'&&view.action!=='reconcile';
+ el('paidState').textContent=snapshot.allowPaid?'كل تشغيل يحتاج مراجعة الكلفة وموافقتك.':'التشغيل المدفوع مقفل حالياً؛ يمكن عرض الخطة فقط.';
+ const resource=(tracked?.action==='prepare'?tracked:view.start)||[...view.jobs].reverse().find(j=>j.action==='start'),stopAt=resource?.cloudStopped?(resource.stoppedAt||resource.finishedAt||resource.updatedAt):Date.now(),seconds=resource?.startedAt?Math.max(0,(stopAt-resource.startedAt)/1000):0;
+ const recorded=resource?.result?.recordedCost||view.active?.cleanup?.recordedCost||view.video?.result?.recordedCost;
+ const estimateUSD=resource?.action==='prepare'&&!resource.cloudStopped?resource.estimate?.resourceWindowUSD:resource?.estimatedUSD??(Number.isFinite(resource?.estimate?.rate)?seconds*resource.estimate.rate:null);
+ el('elapsed').textContent=resource?seconds.toFixed(0)+' ثانية':'—';
+ el('cost').textContent=resource?(Number.isFinite(estimateUSD)?'$'+estimateUSD.toFixed(4)+(resource.action==='prepare'&&!resource.cloudStopped?' (نافذة حوسبة الحسابين)':''):'غير معروفة')+' / '+(recorded?'$'+recorded.usd:'غير متاحة'):'—';
+ const gpu=(resource?.settings?.gpu||values().gpu)==='L40S'?'L40S · 48GB':'RTX PRO 6000 · 96GB';
+ el('gpuName').textContent=gpu+(resource?.action==='prepare'?' — مختار؛ التجهيز CPU فقط':'');
+ const inFlight=['preparing','ready','generating','settingup','stopping','uncertain'].includes(view.state);el('preparation').hidden=!inFlight||progress.idle;el('phaseTitle').textContent=view.state==='settingup'?'مراحل تجهيز الحساب':tracked?.action==='generate'?'مراحل إنشاء الفيديو':'مراحل تجهيز المحرك';
+ const steps=model.stages(tracked);el('stages').replaceChildren();for(const step of steps){const item=document.createElement('li');item.className=step.status;item.textContent=step.label;el('stages').append(item);}
+ const last=tracked?.events?.at(-1);el('phaseSpinner').hidden=progress.finished||progress.idle||!['preparing','settingup','stopping'].includes(view.state);el('phaseCounter').textContent=steps.filter(s=>s.status==='done').length+' / '+steps.length+' مراحل مؤكدة';
+ el('phaseDetail').textContent=last?.kind==='progress'&&last.total>0?last.completed+' / '+last.total+' — تقدم هذه المرحلة فقط':view.state==='ready'?'ورد تأكيد الجاهزية الفعلي من GPU.':'لا توجد نسبة إجمالية مصطنعة؛ المتبقي غير معروف.';
+
 }
-function renderJobs(){
- const container=el('jobs');if(!snapshot.jobs.length){container.replaceChildren();container.append(node('p','لا توجد عمليات بعد.','muted'));return;}
- const oldCards=new Map([...container.children].filter(c=>c.dataset.jobId).map(c=>[c.dataset.jobId,c]));if(!oldCards.size)container.replaceChildren();
- for(const job of [...snapshot.jobs].reverse()){
-  const signature=JSON.stringify([job.status,job.updatedAt,job.events.at(-1),job.result,job.cleanup,['queued','running','ready','stopping'].includes(job.status)?Math.floor(Date.now()/3000):null]);
-  const oldCard=oldCards.get(job.id);if(oldCard?.dataset.signature===signature)continue;
-  const card=node('article','', 'job');card.append(node('strong',labels[job.status]||job.status),node('div',job.action+' · '+job.settings.gpu+' · '+job.id));
-  const active=['running','ready','stopping','queued'].includes(job.status),last=job.events.at(-1),elapsed=job.startedAt?((job.cloudStopped?(job.stoppedAt||job.finishedAt||job.completedAt||job.updatedAt||Date.now()):Date.now())-job.startedAt)/1000:0;
-  const cost=job.cleanup?.recordedCost||job.result?.recordedCost;card.append(node('p','الزمن: '+elapsed.toFixed(1)+' ثانية · الكلفة التقديرية الزمنية: '+(job.estimate.rate===null?'غير معروفة؛ راجع التخزين والنقل بالخطة':'$'+(elapsed*job.estimate.rate).toFixed(4))+' · المسجلة: '+(cost?'$'+cost.usd+' (قد تُحدّث لاحقاً؛ للتطبيق فقط، وقد لا تشمل البناء والتخزين)':'غير متاحة')+' · المتبقي: غير معروف'));
-  if(job.estimate.rate&&elapsed*job.estimate.rate>=job.settings.budget*.8)card.append(node('p','تنبيه: التقدير الزمني بلغ 80% من حد المهمة أو تجاوزه. الإلغاء لا يضمن سقف الفاتورة.','warning'));
-  const stages=job.action==='prepare'?[['connection','فحص الاتصال'],['source_discovery','تحديد المصدر'],['storage','تجهيز التخزين'],['transfer','استلام الأوزان'],['upload','رفع إلى الحساب'],['integrity','فحص السلامة'],['engine_configuration','حفظ إعدادات المحرك']]:[['application_setup','تجهيز التطبيق'],['gpu_dispatch_to_first_event','إقلاع الحاوية / اتصال RPC'],['text_forward','ترميز النص'],['transformer_build','بناء Transformer'],['denoise_stage_1','التوليد 1'],['denoise_stage_2','التوليد 2'],['video_decode','فك الفيديو'],['audio_decode','فك الصوت'],['finalize_mp4','حفظ MP4']];
-  const steps=node('div','','steps');for(const [key,text] of stages){const ended=job.events.some(e=>e.phase===key&&e.kind==='phase_end');const current=last?.phase===key;steps.append(node('span',text,'step'+(current?' active':ended?' done':'')));}card.append(steps);
-  if(job.action==='prepare')card.append(node('p','الملفات التي اجتازت SHA: '+(job.verifiedFiles?.length||0)+' / 5 · الملفات ضمن خطة النقل: '+(job.plan?.files?.length??'غير معروف')));
-  if(last?.file)card.append(node('small','الملف الحالي: '+last.file));
-  if(last){card.append(node('p','المرحلة: '+(last.phase||last.kind||'غير معروف')));if(last.kind==='progress'&&last.total>0){const p=document.createElement('progress');p.max=last.total;p.value=last.completed;card.append(p,node('small',last.completed+' / '+last.total+' '+last.unit+' — تقدم هذه المرحلة فقط'));}else if(last.unit==='source_bytes_received'&&last.required>0){const p=document.createElement('progress');p.max=last.required;p.value=last.transferred;card.append(p,node('small',bytes(last.transferred)+' / '+bytes(last.required)+' · '+bytes(last.rate)+'/s — استلام المصدر فقط؛ الرفع والفحص مرحلتان منفصلتان'));}else if(active)card.append(node('div','','indeterminate'));}
-  if(job.error){card.append(node('p',job.error,'warning'));const alternatives=snapshot.accounts.filter(a=>a.id!==job.accountId&&a.discovery?.ready);if(alternatives.length)card.append(node('p','حسابات مجهزة يمكن فحصها يدوياً للمهام الجديدة: '+alternatives.map(a=>a.label).join('، ')+'. لا ننقل المهمة الجارية أو نعيدها تلقائياً.','muted'));}card.append(node('small','توقف الموارد مؤكد: '+(job.cloudStopped?'نعم':'غير مؤكد / لم ينتهِ الفحص')));
-  const actions=node('div','','actions');if(active||(!job.cloudStopped&&job.action!=='prepare')){const stop=node('button','طلب الإيقاف','danger');stop.onclick=()=>stopJob(job.id);actions.append(stop);}if(job.action!=='prepare'){const verify=node('button','فحص الحاويات والمهام','secondary');verify.onclick=()=>act(async()=>inspect(await api.request('jobs/'+job.id+'/reconcile',{})));actions.append(verify);}if(['failed','needs_review','stopped','uncertain','recovery_required'].includes(job.status)&&job.action==='prepare'){const retry=node('button','فحص وخطة استكمال جديدة','secondary');retry.onclick=()=>quote('prepare',job.accountId);actions.append(retry);}if(job.status==='failed'&&job.action==='generate'&&job.cloudStopped){const retry=node('button','خطة إعادة محاولة للمشهد الفاشل — بموافقة جديدة','secondary');retry.onclick=()=>retryFailed(job.id);actions.append(retry);}card.append(actions);
-  if(job.status==='completed'&&job.result?.videoVerified){const video=document.createElement('video');video.controls=true;video.playsInline=true;video.crossOrigin='use-credentials';video.src=api.videoURL(job.id);const download=node('a','تنزيل MP4');download.href=video.src;download.download=job.id+'.mp4';card.append(video,download);}
-  const details=document.createElement('details');details.append(node('summary','السجل المختصر وأوقات المراحل'),node('pre',JSON.stringify({events:job.events,result:job.result,cleanup:job.cleanup},null,2)));const full=node('button','جلب التقرير الكامل','secondary');full.onclick=()=>act(async()=>inspect(await api.request('jobs/'+job.id)));card.append(details,full);card.dataset.jobId=job.id;card.dataset.signature=signature;card.dataset.createdAt=String(job.createdAt);if(oldCard)oldCard.replaceWith(card);else{const anchor=[...container.children].find(c=>Number(c.dataset.createdAt)<job.createdAt);container.insertBefore(card,anchor||null);}
- }
+async function prepareQuote(kind,probeOnly=false,verifyOnly=false){
+ if(!view?.account)throw Error('الحساب الأساسي يحتاج تفويضاً آمناً على الخادم.');
+ const input={action:kind,accountId:view.account.id,settings:values()};
+ if(kind==='prepare'&&probeOnly)input.probeOnly=true;
+ if(kind==='prepare'&&verifyOnly)input.verifyOnly=true;
+ quote=await api.request('quote',input);
+ const cloud=quote.plan?.transport==='modal-cpu-cloud';
+ let lines;
+ if(kind==='prepare'){
+  const plan=quote.plan,verify=plan.mode==='verify-only',probe=plan.mode==='probe';
+  lines=[verify?'فحص الأوزان الموجودة فقط — لا نقل ولا GPU':labels[kind],
+   'الحساب المقصود: '+view.account.workspace,
+   probe?'اختبار 64KiB فقط؛ لا ينقل النموذج ولا يعلن الحساب جاهزاً.':verify?'نفحص بصمات الموجود داخل حساب الوجهة؛ لا نحذف أو نرفع أي وزن.':'الملفات الناقصة: '+plan.files.length+'، الحجم '+gib(plan.requiredBytes),
+   'الحساب الأساسي وأوزانه لا تُحذف أو تُعدّل.'];
+  if(cloud){
+   lines.push('المسار الجديد: نسخ من المصدر السحابي وفحص SHA256 محلياً قرب Volume الوجهة؛ لا تمر الأوزان بقرص HostHatch.',
+    'CPU المصدر: 2 CPU و4 GiB RAM؛ مهلة '+plan.compute.timeoutSeconds+' ثانية.',
+    'استدعاءات فحص CPU في حساب الوجهة: '+plan.compute.destination.calls+'؛ لكل منها 2 CPU و4 GiB RAM ومهلة 600 ثانية.',
+    'تقدير نافذة الحوسبة للحسابين معاً $'+plan.compute.resourceWindowUSD.toFixed(4)+'؛ ليس سقف فاتورة.',
+    plan.destinationVerifierMayDeploy?'أول تجهيز لهذا الحساب قد ينشئ تطبيق فحص CPU وVolume إذا كان النقل الكامل يحتاجه. بناء صورة العامل وتخزينه كلفتهما غير معروفة ومنفصلة؛ لا GPU.':'هذا الاختبار الصغير لا يثبت سرعة فحص الأوزان الكبيرة.',
+    'رسوم النقل والتخزين والحصص المجانية غير متحققة. تقدير الحوسبة لا يشملها.',
+    plan.workerReady?'العامل يطابق نسخة البروتوكول الجديدة.':'التنفيذ محجوب: يلزم نشر نسخة العامل الجديدة بموافقة منفصلة؛ لا نقل بالخلفية.');
+  }else lines.push('المسار القديم يستخدم قرص HostHatch مؤقتاً. المطلوب '+gib(plan.localStagingRequiredBytes)+'؛ المتاح '+gib(plan.localStagingAvailableBytes));
+  if(!verify&&!probe)lines.push('سعر قائمة التخزين نحو $'+plan.storageUSDPerMonth.toFixed(2)+' شهرياً قبل الحصص؛ لا يعاد النقل كل شهر.');
+ }else lines=[labels[kind],'الحساب: '+view.account.workspace,'GPU: '+quote.settings.gpu,
+  'الأبعاد: '+quote.quality.width+'×'+quote.quality.height,
+  Number.isFinite(quote.estimate.resourceWindowUSD)?'تقدير نافذة الجلسة الحالية: $'+quote.estimate.resourceWindowUSD.toFixed(4):'المدة والكلفة النهائية غير معروفتين مسبقاً؛ متابعة وإيقاف يدويان.',
+  'معدل الموارد التقديري: $'+(quote.estimate.rate*60).toFixed(4)+' للدقيقة. ليس فاتورة نهائية.',
+  quote.settings.budget===0?'لا يوجد حد مالي مخصص لهذه المهمة داخل التطبيق.':'الجلسة الحالية تحتفظ بإعدادات تشغيلها السابقة حتى تتوقف.',
+  'الخمول مدفوع ويتوقف بعد 20 دقيقة؛ زر إيقاف يحرر الموارد. تبقى مهلة Modal التقنية؛ البناء والتخزين والنقل قد تضاف.'];
+ if(!quote.paidEnabled)lines.push('التنفيذ المدفوع مقفل بالخادم.');quote.canExecute=quote.paidEnabled&&(kind!=='prepare'||(cloud?quote.plan.executionReady:quote.plan.localStagingReady));
+ el('approvedText').hidden=kind!=='generate';el('sentPrompt').textContent=quote.prompt||'';
+ el('quote').textContent=lines.join('\n');el('execute').disabled=!quote.canExecute;el('approval').showModal();
 }
-async function quote(action,aid){await act(async()=>{currentQuote=await api.request('quote',{action,accountId:aid||accountId(),settings:values(),prompt:el('scenePrompt').value,source:el('sourceMode').value,licenseAccepted:el('licenseAccepted').checked,projectId:'admin-preview',sceneId:crypto.randomUUID()});el('quote').textContent=quoteSummary(currentQuote);inspect(currentQuote);el('confirmation').value='';el('execute').disabled=!currentQuote.paidEnabled;el('approval').showModal();});}
-async function stopJob(jobId){if(!confirm('إلغاء المهمة الجارية وإيقاف مواردها؟ قد تبقى رسوم حتى يؤكد Modal توقفها.'))return;await act(async()=>inspect(await api.request('jobs/'+jobId+'/stop',{confirmCancel:true})));}
-el('login').onsubmit=e=>{e.preventDefault();act(async()=>{try{if(el("engineBackend").value)api.setBase(el("engineBackend").value);const r=await api.request('login',{username:el('username').value,password:el('password').value});api.csrf=r.csrf;notify('تم دخول المسؤول. لا توجد أي عملية مدفوعة تلقائية.');}finally{el('password').value='';}});};
-el('link').onsubmit=e=>{e.preventDefault();act(async()=>{const input={label:el('label').value,tokenId:el('tokenId').value.trim(),tokenSecret:el('tokenSecret').value.trim()};el('tokenId').value='';el('tokenSecret').value='';inspect(await api.request('accounts',input));notify('تم التحقق وربط الحساب. لم يُشغّل GPU.');});};
-el('primary').onclick=()=>act(async()=>inspect(await api.request('primary',{})));
-el('discover').onclick=()=>act(async()=>{const primary=snapshot.accounts.find(a=>a.role==='primary');if(!primary)throw Error('اربط الحساب الأساسي بتفويض صالح أولاً');inspect(await api.request('accounts/'+primary.id+'/discover',{}));});
-el('selection').onsubmit=e=>{e.preventDefault();act(async()=>{inspect(await api.request('selection',{accountId:accountId(),settings:values()}));notify('حُفظ الاختيار بعد فحص مجاني؛ لم يُشغّل GPU.');});};
-el('check').onclick=()=>act(async()=>inspect(await api.request('accounts/'+accountId()+'/check',{})));
-el('prepare').onclick=()=>quote('prepare');el('start').onclick=()=>quote('start');el('generate').onclick=()=>quote('generate');
-el('stop').onclick=()=>{const job=[...snapshot.jobs].reverse().find(j=>['running','ready','stopping','uncertain','recovery_required'].includes(j.status)&&!j.cloudStopped);if(job)stopJob(job.id);else notify('لا توجد مهمة نشطة معروفة.');};
-el('unlink').onclick=()=>act(async()=>{if(confirm('حذف بيانات الربط وأسراره من الخادم؟ لن تُحذف الأوزان، وقد تستمر رسوم تخزينها. لا يُلغى التوكن لدى Modal.'))inspect(await api.request('accounts/'+accountId(),undefined,'DELETE'));});
-el('hf').onsubmit=e=>{e.preventDefault();act(async()=>{const token=el('hfToken').value;el('hfToken').value='';inspect(await api.request('accounts/'+accountId()+'/hf',{token}));});};
-el('approve').onsubmit=e=>{e.preventDefault();act(async()=>{el('execute').disabled=true;try{const result=await api.request('execute',{quoteId:currentQuote.id,confirmation:el('confirmation').value});inspect(result);el('approval').close();notify('سُجّل الطلب مرة واحدة. تابع الحالة الحقيقية أدناه.');}finally{el('confirmation').value='';}});};
-el('cancelQuote').onclick=()=>el('approval').close();el('logout').onclick=()=>act(async()=>{await api.request('logout',{});location.reload();});
-api.session().then(async()=>{await refresh();notify('جلسة مسؤول آمنة. الفحص مجاني، والتنفيذ المدفوع يحتاج تأكيداً منفصلاً.');}).catch(e=>notify(e.code==='BACKEND_NOT_CONFIGURED'?'الخلفية الآمنة تحتاج إعداد مفتاح التشفير وحساب المسؤول. استقبال التوكنات والتشغيل مقفلان.':'سجّل دخول المسؤول عبر HTTPS للمتابعة. '+e.message));
-setInterval(()=>{if(snapshot&&!busy)refresh().catch(e=>notify(e.message));},3000);
-
-el("monthlyBudget").onsubmit=e=>{e.preventDefault();act(async()=>inspect(await api.request("budget",{limitUSD:el("monthlyLimit").value===""?null:Number(el("monthlyLimit").value)})));};
-
-function quoteSummary(q){const account=snapshot.accounts.find(a=>a.id===q.accountId);const lines=["العملية: "+({prepare:"تجهيز الأوزان فقط — دون GPU",start:"تحميل المحرك — دون توليد تلقائي",generate:"توليد مشهد واحد"}[q.action]),"الحساب: "+(account?.label||q.accountId)+" / "+(account?.workspace||""),"النموذج: LTX-2.5 Distilled، نسخة مثبتة"];if(q.action==="prepare"){lines.push("الملفات الناقصة حسب الحجم: "+q.plan.files.length,"نقل متوقع: "+bytes(q.plan.requiredBytes),"فحص بصمات قد يقرأ حتى "+bytes(q.plan.integrityReadBytes)+"؛ الملفات السليمة لا يعاد نقلها.","التخزين بسعر القائمة: $"+q.plan.storageUSDPerMonth.toFixed(2)+" / شهر قبل أي إعفاءات؛ يبقى التخزين بعد انتهاء النقل.","كلفة حركة البيانات واستضافة الخادم: غير معروفة. راجع مزودك قبل الموافقة.","المصدر: "+(q.plan.source==="official"?"Hugging Face الرسمي، مع تصاريح الحساب":"Volume الحساب الأساسي — للقراءة فقط"));}else{lines.push("GPU: "+q.settings.gpu+" · CPU: "+q.settings.cpu+" · RAM: "+q.settings.ram+" GiB / حد أقصى "+q.settings.ramLimit+" GiB","10 ثوانٍ · 576×1024 عمودي · نافذة 241 إطاراً · صوت LTX الأصلي","مهلة الإقلاع: "+q.settings.startup+" ث | التنفيذ: "+q.settings.timeout+" ث | انتظار اختياري حتى 15 ث","تقدير نافذة الموارد: $"+q.estimate.resourceWindowUSD.toFixed(4),"رسوم بناء الصورة والنقل والتخزين إن وجدت: إضافية وغير محسومة.","زمن الإنجاز المتوقع: غير معروف؛ توفر الكرت غير مضمون.");}lines.push("الكلفة المسجلة: غير متوفرة قبل التنفيذ.",q.paidEnabled?"التنفيذ يحتاج تأكيدك الصريح أدناه.":"التنفيذ المدفوع مقفل بالخادم؛ هذه خطة فقط.");return lines.join("\n");}
-
-el("removeHF").onclick=()=>act(async()=>{if(confirm("حذف توكن Hugging Face من الخادم؟ لا يتم إلغاؤه لدى المزود."))inspect(await api.request("accounts/"+accountId()+"/hf",undefined,"DELETE"));});
-
-async function retryFailed(jobId){await act(async()=>{const old=await api.request('jobs/'+jobId);currentQuote=await api.request('quote',{action:'generate',retryOfJobId:old.id,accountId:accountId(),settings:{...values(),seed:old.settings.seed},prompt:old.prompt,projectId:old.projectId,sceneId:old.sceneId});el('quote').textContent=quoteSummary(currentQuote);inspect(currentQuote);el('confirmation').value='';el('execute').disabled=!currentQuote.paidEnabled;el('approval').showModal();});}
+el('powerToggle').onclick=()=>action(async()=>{
+ if(view.action==='start'){await prepareQuote('start');return;}
+ if(view.action==='prepare'){await prepareQuote('prepare');return;}
+ if(view.action==='activate'){await api.request('accounts/'+view.account.id+'/activate',{});await api.request('selection',{accountId:view.account.id,settings:values()});notice('انحفظ الحساب وأصبح متاحاً من قائمة الحسابات؛ اضغط تشغيل عند الحاجة.');return;}
+ const job=view.active;if(!job)return;
+ if(view.action==='reconcile'){const check=await api.request('jobs/'+job.id+'/reconcile',{});if(!check.cloudStopped)await api.request('jobs/'+job.id+'/stop',{confirmCancel:true});notice('تم فحص الموارد وطلب إيقاف المتبقي منها، دون تشغيل جديد.');return;}
+ await api.request('jobs/'+job.id+'/stop',{confirmCancel:true});notice('أُرسل طلب الإيقاف. ننتظر تأكيد توقف الموارد.');
+});
+el('approve').onsubmit=event=>{event.preventDefault();if(!quote?.canExecute||busy)return;action(async()=>{el('execute').disabled=true;try{const result=await api.request('execute',{quoteId:quote.id,approvedCost:true});el('approval').close();notice('سُجلت مهمة واحدة. الحالة تُحدث من الخادم.');}finally{el('execute').disabled=!quote?.canExecute;}});};
+el('cancelQuote').onclick=()=>el('approval').close();
+el('accountSelect').onchange=()=>action(async()=>{const id=el('accountSelect').value;await api.request('selection',{accountId:id,settings:values()});notice('تم فحص الحساب واختياره؛ لم يبدأ GPU أو نقل أوزان.');});
+function clearCredentials(){el('modalTokenId').value='';el('modalTokenSecret').value='';}
+el('cancelAccount').onclick=()=>{clearCredentials();el('accountDialog').close();};
+el('accountDialog').addEventListener('close',clearCredentials);
+el('accountForm').onsubmit=event=>{event.preventDefault();action(async()=>{
+ const credentials={tokenId:el('modalTokenId').value.trim(),tokenSecret:el('modalTokenSecret').value.trim()};clearCredentials();
+ el('saveAccount').disabled=true;el('accountMessage').textContent='جارٍ التحقق من الحساب عبر Modal وحفظ التفويض مشفّراً…';
+ try{if(renewingAccount){await api.request('accounts/'+renewingAccount+'/credentials',credentials);el('accountDialog').close();notice('تم التحقق من التفويض الجديد وحفظه مشفّراً دون تغيير الأوزان.');return;}const linked=await api.request('accounts',credentials);await api.request('selection',{accountId:linked.id,settings:values()});el('accountDialog').close();await refresh();notice('تم الربط المشفّر. جارٍ فحص خطة التجهيز، دون تنفيذ نقل.');await prepareQuote('prepare');}
+ catch(error){el('accountMessage').textContent=model.explainError(error.message);throw error;}
+ finally{el('saveAccount').disabled=false;credentials.tokenId='';credentials.tokenSecret='';}
+});};
+api.session().then(async()=>{await refresh();notice('اختر الحساب ثم شغّل المحرك؛ التوليد والنقاش داخل صناعة فيلم كامل.');}).catch(error=>{notice(model.explainError(error.message));if(!snapshot){el('accountSelect').options[0].textContent='تعذر جلب الحسابات — الخلفية غير متصلة';el('engineStatus').textContent='الخلفية غير متصلة';el('statusDetail').textContent='لم يتم جلب بيانات الحسابات من الخادم. هذا لا يعني حذف الحسابات المحفوظة.';}});
+setInterval(()=>{if(snapshot&&!busy)refresh().catch(error=>notice(model.explainError(error.message)));},2000);setInterval(()=>{if(snapshot&&!busy)render();},1000);

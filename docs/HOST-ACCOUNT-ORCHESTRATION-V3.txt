@@ -1,0 +1,58 @@
+LOCAL IMPLEMENTATION — NOT DEPLOYED OR CLOUD-VALIDATED
+
+Purpose
+HostHatch orchestrates independent official Modal clients for the source and
+destination. Source CPU workers no longer spawn or wait for destination workers.
+This removes a suspected account/context boundary; it does not prove the exact
+cause of the previous failed invocation.
+
+Flow
+1. An administrator obtains a fresh quote and explicitly approves this job.
+2. Durable account/job/Volume-scoped reservation, then destination CPU verifier.
+3. Verification-only finishes here: zero source CPU calls, zero model uploads,
+   no READY marker, no account activation.
+4. For full preparation, HostHatch starts the source CPU worker once. It uses
+   the before-receipt to skip valid saved files, hashes source files, uploads
+   only approved missing/corrupt files, and returns without final verification.
+5. HostHatch starts the independent destination CPU verifier for the final SHA.
+6. Only after all five checks succeed, HostHatch uploads tiny RUNTIME.json and
+   READY.json metadata. Model bytes never pass through HostHatch disk or RAM.
+7. Completion requires terminal calls plus zero tasks in both applications.
+
+Durability / safety
+Per-stage reservations and receipts live in the existing Modal registry, with
+the overall user job in the existing backend store. Polling after a process
+restart resumes existing call IDs and cannot resubmit reserved stages. An
+ambiguous dispatch remains unknown and blocks another job; zero containers
+alone cannot prove that a queued invocation stopped. Operator reconciliation
+may be required. No automatic retry, GPU allocation, primary modification,
+weight deletion, or automatic account activation was added.
+
+Timeout / costs
+Per source call: 3600s execution, 180s startup, 2s scaledown allowance.
+Per destination call: 600s execution, 180s startup, 2s scaledown allowance.
+The host watchdog uses the sum of sequential windows rather than just the
+source window. Build/setup may consume additional time and remains subject
+to the existing provider timeout and uncertain-state handling.
+Using the project's previously recorded CPU/RAM list rates, verification-only
+resource allowance is 782 * 0.00003508 = $0.02743256. Full preparation remains
+5346 * 0.00003508 = $0.18753768, plus unknown image build, network and storage.
+These are conservative allowances, not measured bills or guaranteed caps;
+pricing was not refreshed or billed during this local change.
+
+Compatibility / rollout gate
+The v3 fingerprint invalidates stale v2 quotes and worker deployments. Deploy
+the updated source worker only with separate cost approval. Backend/UI
+publication and destination helper deployment have not been performed here.
+Legacy job status remains available for old records without hostOrchestrated.
+Keep the live transfer freeze in place until an approved rollout. Do not delete
+the existing destination model file or use a new full copy to test this fix.
+Recommended first cloud validation: one separately approved verify-only job
+against the existing destination Volume, no source CPU, no model download.
+
+Official references
+https://modal.com/docs/sdk/py/latest/Client
+https://modal.com/docs/guide/trigger-deployed-functions
+https://modal.com/docs/sdk/py/latest/Volume
+
+Cloud outcome is UNVERIFIED until that separately approved test succeeds.

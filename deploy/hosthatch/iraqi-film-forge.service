@@ -1,0 +1,28 @@
+[Unit]
+Description=Iraqi Film Forge isolated staging backend
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+User=iff
+Group=iff
+WorkingDirectory=/srv/iraqi-film-forge/current
+Environment=NODE_ENV=production
+Environment=PATH=/opt/node-v24.14.1-linux-x64/bin:/usr/local/bin:/usr/bin:/bin
+ExecStartPre=/usr/bin/python3 /srv/iraqi-film-forge/current/deploy/hosthatch/verify-source-readonly.py
+ExecStart=/usr/local/bin/node --env-file=/etc/iraqi-film-forge/app.env server.mjs
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=45
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/iraqi-film-forge
+MemoryMax=1G
+TasksMax=128
+LimitNOFILE=4096
+
+[Install]
+WantedBy=multi-user.target
