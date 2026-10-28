@@ -1,3 +1,11 @@
+# Current Pages access — 2026-10-28
+
+The GitHub Pages entry points now open the actual authenticated HostHatch application at https://167.104.162.4/film.html. Pages does not host the backend, PostgreSQL or GPU runtime. The browser performs provider calls only on the HostHatch origin; there is no cross-site credential forwarding or API proxy in this launcher.
+
+The launcher never reads old browser credentials/storage, starts a GPU, or invokes paid services. Only a validated project identifier is preserved. Other query parameters and fragments are dropped. Existing static assets and historical Git revisions are retained; no user data is migrated or deleted. The source development branch and the live-vs-local DFR distinction remain separate from this Pages access update.
+
+---
+
 # Iraqi Film Forge — ستوديو الأفلام العراقي
 
 Independent project for cinematic Iraqi-language video production. **Not connected to Mashhad**.
